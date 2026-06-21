@@ -22,6 +22,29 @@
       <div class="room-layout">
         <!-- Video column -->
         <section class="video-col" aria-label="Video player">
+          <!-- Now Watching Header -->
+          <div v-if="currentMetadata && (currentMetadata.title || currentMetadata.source)" class="now-watching-header glass animate-fade-in">
+            <img 
+              v-if="currentMetadata.thumbnailUrl" 
+              :src="currentMetadata.thumbnailUrl" 
+              alt="Anime Cover"
+              class="anime-thumbnail"
+              referrerpolicy="no-referrer"
+            />
+            <div class="metadata-info">
+              <span class="watching-label">NOW WATCHING</span>
+              <h2 class="anime-title">
+                {{ currentMetadata.title || 'Stream Source' }}
+              </h2>
+              <span v-if="currentMetadata.episode" class="episode-info">
+                {{ currentMetadata.episode }}
+              </span>
+              <span v-if="!currentMetadata.title && currentMetadata.source" class="stream-source">
+                {{ currentMetadata.source }}
+              </span>
+            </div>
+          </div>
+
           <VideoPlayer
             :is-host="isHost"
             :video-url="playerState.videoUrl"
@@ -95,27 +118,30 @@ const hasJoined  = ref(isHost)   // host enters immediately, guest waits for nic
 // We initialize lazily (after nickname is known for guests)
 let room = null
 
-const wsStatus     = ref('disconnected')
-const messages     = ref([])
-const playerState  = ref({ videoUrl: '', currentTime: 0, isPlaying: false })
-const participants = ref([])
-const scrapeError  = ref(null)
-const isConnected  = computed(() => wsStatus.value === 'connected')
+const wsStatus        = ref('disconnected')
+const messages        = ref([])
+const playerState     = ref({ videoUrl: '', currentTime: 0, isPlaying: false })
+const participants    = ref([])
+const scrapeError     = ref(null)
+const currentMetadata = ref(null)
+const isConnected     = computed(() => wsStatus.value === 'connected')
 
 function initRoom() {
   room = useRoom(roomId, nickname.value, isHost)
   // Sync reactive refs initially
-  wsStatus.value     = room.status.value
-  messages.value     = room.messages.value
-  playerState.value  = room.playerState.value
-  participants.value = room.participants.value
+  wsStatus.value        = room.status.value
+  messages.value        = room.messages.value
+  playerState.value     = room.playerState.value
+  participants.value    = room.participants.value
+  currentMetadata.value = room.currentMetadata.value
 
   // Keep local refs in sync with the composable's reactive state
-  watch(room.status,       v => { wsStatus.value    = v })
-  watch(room.messages,     v => { messages.value    = v }, { deep: true })
-  watch(room.playerState,  v => { playerState.value = v }, { deep: true })
-  watch(room.participants, v => { participants.value = v }, { deep: true })
-  watch(room.scrapeError,  v => { scrapeError.value  = v })
+  watch(room.status,          v => { wsStatus.value    = v })
+  watch(room.messages,        v => { messages.value    = v }, { deep: true })
+  watch(room.playerState,     v => { playerState.value = v }, { deep: true })
+  watch(room.participants,    v => { participants.value = v }, { deep: true })
+  watch(room.scrapeError,     v => { scrapeError.value  = v })
+  watch(room.currentMetadata, v => { currentMetadata.value = v }, { deep: true })
 
   room.joinRoom()
 }
@@ -173,6 +199,59 @@ function onSendChat(text) {
   display: flex;
   flex-direction: column;
   gap: var(--space-4);
+}
+
+/* Now Watching Header Styles */
+.now-watching-header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  padding: var(--space-4);
+  border-radius: var(--radius-lg);
+  border-left: 3px solid var(--color-primary);
+  box-shadow: var(--shadow-card);
+}
+
+.anime-thumbnail {
+  width: 60px;
+  height: 80px;
+  object-fit: cover;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-glass-border);
+}
+
+.metadata-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.watching-label {
+  font-size: 0.6875rem;
+  font-weight: 700;
+  color: var(--color-primary);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.anime-title {
+  margin: 0;
+  font-size: 1.15rem;
+  font-weight: 800;
+  color: var(--text-primary);
+  line-height: 1.2;
+}
+
+.episode-info {
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+.stream-source {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  font-style: italic;
 }
 
 .chat-col {

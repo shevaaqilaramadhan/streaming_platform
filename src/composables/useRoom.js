@@ -35,6 +35,9 @@ export function useRoom(roomId, nickname, isHost) {
   /* ---- Participants ---- */
   const participants = ref([])
 
+  /* ---- Video Metadata ---- */
+  const currentMetadata = ref(null)
+
   /* ---- Computed ---- */
   const isConnected = computed(() => status.value === WS_STATUS.CONNECTED)
 
@@ -65,6 +68,7 @@ export function useRoom(roomId, nickname, isHost) {
         if (data.payload?.participants) {
           participants.value = data.payload.participants
         }
+        currentMetadata.value = data.payload.metadata || null
         break
 
       case MSG_TYPES.SYNC_EVENT:
@@ -111,7 +115,8 @@ export function useRoom(roomId, nickname, isHost) {
         break
 
       case MSG_TYPES.SET_VIDEO:
-        playerState.value.videoUrl    = data.payload.url
+        playerState.value.videoUrl    = data.payload.videoUrl
+        currentMetadata.value         = data.payload.metadata || null
         playerState.value.currentTime = 0
         playerState.value.isPlaying   = false
         scrapeError.value = null  // clear previous error on successful video load
@@ -186,6 +191,7 @@ export function useRoom(roomId, nickname, isHost) {
     playerState,
     participants,
     scrapeError,
+    currentMetadata,
     joinRoom,
     leave,
     sendChatMessage,

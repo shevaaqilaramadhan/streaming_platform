@@ -16,13 +16,14 @@ type User struct {
 }
 
 type WatchRoom struct {
-	RoomID       string
-	HostID       string
-	CurrentVideo string
-	CurrentTime  float64
-	IsPlaying    bool
-	Clients      map[string]*User
-	Mutex        sync.RWMutex
+	RoomID          string
+	HostID          string
+	CurrentVideo    string
+	CurrentTime     float64
+	IsPlaying       bool
+	CurrentMetadata *VideoMetadata
+	Clients         map[string]*User
+	Mutex           sync.RWMutex
 }
 
 type Message struct {
@@ -42,11 +43,12 @@ type Participant struct {
 }
 
 type RoomInitPayload struct {
-	RoomID       string        `json:"roomId"`
-	CurrentVideo string        `json:"currentVideo"`
-	CurrentTime  float64       `json:"currentTime"`
-	IsPlaying    bool          `json:"isPlaying"`
-	Participants []Participant `json:"participants"`
+	RoomID       string         `json:"roomId"`
+	CurrentVideo string         `json:"currentVideo"`
+	CurrentTime  float64        `json:"currentTime"`
+	IsPlaying    bool           `json:"isPlaying"`
+	Participants []Participant  `json:"participants"`
+	Metadata     *VideoMetadata `json:"metadata,omitempty"`
 }
 
 type SyncPayload struct {
@@ -82,4 +84,12 @@ type JoinBroadcastPayload struct {
 type ScrapeErrorPayload struct {
 	OriginalURL string `json:"originalUrl"`
 	Error       string `json:"error"`
+}
+
+type VideoMetadata struct {
+	VideoURL     string `json:"videoUrl"`
+	Title        string `json:"title,omitempty"`
+	Episode      string `json:"episode,omitempty"`
+	ThumbnailURL string `json:"thumbnailUrl,omitempty"`
+	Source       string `json:"source,omitempty"`
 }

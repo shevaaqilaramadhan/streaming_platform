@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/PuerkitoBio/goquery"
+	"watchparty-backend/models"
 )
 
 var (
@@ -34,7 +35,7 @@ var (
 	packerRegex = regexp.MustCompile(`(?s)eval\(function\(p,a,c,k,e,d\).*?\}\('(.*?)',\s*(\d+),\s*(\d+),\s*'(.*?)'\.split\('\|'\)`)
 )
 
-func ScrapeStreamURL(pageURL string) (string, error) {
+func ScrapeStreamURL(pageURL string) (*models.VideoMetadata, error) {
 	if strings.Contains(pageURL, "otakudesu") {
 		return scrapeOtakudesu(pageURL)
 	}
@@ -47,17 +48,17 @@ type mirror struct {
 	score   int
 }
 
-func scrapeOtakudesu(pageURL string) (string, error) {
+func scrapeOtakudesu(pageURL string) (*models.VideoMetadata, error) {
 	doc, err := fetchPageDocument(pageURL, "")
 	if err != nil {
-		return "", fmt.Errorf("failed to fetch Otakudesu page: %w", err)
+		return nil, fmt.Errorf("failed to fetch Otakudesu page: %w", err)
 	}
 
 	html, _ := doc.Html()
 
 	allActions := actionRegex.FindAllStringSubmatch(html, -1)
 	if len(allActions) < 2 {
-		return "", fmt.Errorf("could not find WordPress AJAX action IDs in page source")
+		return nil, fmt.Errorf("could not find WordPress AJAX action IDs in page source")
 	}
 
 	var nonceAction string
@@ -126,13 +127,13 @@ func scrapeOtakudesu(pageURL string) (string, error) {
 	})
 
 	if len(mirrors) == 0 {
-		return "", fmt.Errorf("no mirrors found on episode page")
+		return nil, fmt.Errorf("no mirrors found on episode page")
 	}
 
 	ajaxURL := "https://otakudesu.blog/wp-admin/admin-ajax.php"
 	nonce, err := fetchNonce(ajaxURL, nonceAction, pageURL)
 	if err != nil {
-		return "", fmt.Errorf("failed to fetch nonce: %w", err)
+		return nil, fmt.Errorf("failed to fetch nonce: %w", err)
 	}
 
 	var lastErr error
@@ -150,14 +151,16 @@ func scrapeOtakudesu(pageURL string) (string, error) {
 		}
 
 		if streamURL := findStreamURLInHTML(embedHTML); streamURL != "" {
-			return streamURL, nil
+			metadata := extractOtakudesuMetadata(doc, pageURL)
+			metadata.VideoURL = streamURL
+			return metadata, nil
 		}
 	}
 
 	if lastErr != nil {
-		return "", fmt.Errorf("failed to resolve stream from mirrors: %w", lastErr)
+		return nil, fmt.Errorf("failed to resolve stream from mirrors: %w", lastErr)
 	}
-	return "", fmt.Errorf("failed to resolve stream from any mirror")
+	return nil, fmt.Errorf("failed to resolve stream from any mirror")
 }
 
 func fetchNonce(ajaxURL, action, referer string) (string, error) {
@@ -293,10 +296,10 @@ func unpackPackerInHTML(html string) []string {
 	return unpacked
 }
 
-func scrapeGeneric(pageURL string) (string, error) {
+func scrapeGeneric(pageURL string) (*models.VideoMetadata, error) {
 	doc, err := fetchPageDocument(pageURL, "")
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
 	var iframeSrcs []string
@@ -311,7 +314,9 @@ func scrapeGeneric(pageURL string) (string, error) {
 
 	html, _ := doc.Html()
 	if streamURL := findStreamURLInHTML(html); streamURL != "" {
-		return streamURL, nil
+		metadata := extractGenericMetadata(doc, pageURL)
+		metadata.VideoURL = streamURL
+		return metadata, nil
 	}
 
 	for _, iframeSrc := range iframeSrcs {
@@ -321,11 +326,13 @@ func scrapeGeneric(pageURL string) (string, error) {
 		}
 
 		if streamURL := findStreamURLInHTML(iframeHTML); streamURL != "" {
-			return streamURL, nil
+			metadata := extractGenericMetadata(doc, pageURL)
+			metadata.VideoURL = streamURL
+			return metadata, nil
 		}
 	}
 
-	return "", fmt.Errorf("could not find .m3u8 stream in page or its iframes")
+	return nil, fmt.Errorf("could not find .m3u8 stream in page or its iframes")
 }
 
 func fetchPageDocument(url, referer string) (*goquery.Document, error) {
@@ -398,4 +405,94 @@ func findStreamURLInHTML(html string) string {
 	}
 
 	return ""
+}
+
+func extractDomain(rawURL string) string {
+	parsed, err := url.Parse(rawURL)
+	if err != nil {
+		return ""
+	}
+	return parsed.Host
+}
+
+func cleanEpisodeString(raw string) string {
+	raw = strings.TrimSpace(raw)
+	lower := strings.ToLower(raw)
+	
+	if idx := strings.Index(lower, "subtitle"); idx != -1 {
+		raw = strings.TrimSpace(raw[:idx])
+	}
+	if idx := strings.Index(lower, "sub indo"); idx != -1 {
+		raw = strings.TrimSpace(raw[:idx])
+	}
+	
+	if !strings.Contains(strings.ToLower(raw), "episode") {
+		re := regexp.MustCompile(`(?i)(?:ep\.?\s*|episode\s*)(\d+)`)
+		if match := re.FindStringSubmatch(raw); len(match) > 1 {
+			return "Episode " + match[1]
+		}
+	}
+	
+	return raw
+}
+
+func extractOtakudesuMetadata(doc *goquery.Document, pageURL string) *models.VideoMetadata {
+	metadata := &models.VideoMetadata{Source: "otakudesu.blog"}
+	
+	title := doc.Find(".venutama .post-title h1").First().Text()
+	if title == "" {
+		title = doc.Find(".fotoanime").Next().Find("h1").First().Text()
+	}
+	if title == "" {
+		title = doc.Find(".entry-content h1").First().Text()
+	}
+	metadata.Title = strings.TrimSpace(title)
+	
+	episodeText := doc.Find(".venutama .epztitle").First().Text()
+	if episodeText == "" {
+		episodeText = doc.Find("h1.entry-title").First().Text()
+	}
+	if episodeText != "" {
+		metadata.Episode = cleanEpisodeString(episodeText)
+	}
+	
+	thumbnail, exists := doc.Find(".fotoanime img").First().Attr("src")
+	if exists && thumbnail != "" {
+		if strings.HasPrefix(thumbnail, "//") {
+			thumbnail = "https:" + thumbnail
+		}
+		metadata.ThumbnailURL = thumbnail
+	}
+	
+	if metadata.Title == "" {
+		ogTitle := doc.Find("meta[property='og:title']").AttrOr("content", "")
+		if ogTitle != "" {
+			metadata.Title = ogTitle
+		} else {
+			metadata.Title = doc.Find("title").First().Text()
+		}
+	}
+	
+	return metadata
+}
+
+func extractGenericMetadata(doc *goquery.Document, pageURL string) *models.VideoMetadata {
+	metadata := &models.VideoMetadata{Source: extractDomain(pageURL)}
+	
+	ogTitle := doc.Find("meta[property='og:title']").AttrOr("content", "")
+	if ogTitle != "" {
+		metadata.Title = ogTitle
+	} else {
+		metadata.Title = doc.Find("title").First().Text()
+	}
+	
+	ogImage := doc.Find("meta[property='og:image']").AttrOr("content", "")
+	if ogImage != "" {
+		if strings.HasPrefix(ogImage, "//") {
+			ogImage = "https:" + ogImage
+		}
+		metadata.ThumbnailURL = ogImage
+	}
+	
+	return metadata
 }

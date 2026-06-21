@@ -65,7 +65,7 @@ func handleJoinEvent(user *models.User, room *models.WatchRoom, payloadRaw json.
 	}
 	room.Mutex.Unlock()
 
-	currentVideo, currentTime, isPlaying, participants := GetRoomState(room.RoomID)
+	currentVideo, currentTime, isPlaying, participants, metadata := GetRoomState(room.RoomID)
 
 	roomInitMsg := models.Message{
 		Action: "ROOM_INIT",
@@ -75,6 +75,7 @@ func handleJoinEvent(user *models.User, room *models.WatchRoom, payloadRaw json.
 			CurrentTime:  currentTime,
 			IsPlaying:    isPlaying,
 			Participants: participants,
+			Metadata:     metadata,
 		})),
 	}
 
@@ -131,7 +132,7 @@ func handleSetVideo(user *models.User, room *models.WatchRoom, payloadRaw json.R
 		return
 	}
 
-	finalURL := payload.URL
+	var metadata *models.VideoMetadata
 
 	if !isYouTubeURL(payload.URL) && !isDirectStreamURL(payload.URL) {
 		log.Printf("Scraping anime page: %s", payload.URL)
@@ -148,21 +149,35 @@ func handleSetVideo(user *models.User, room *models.WatchRoom, payloadRaw json.R
 			SendToUser(user, mustMarshal(errMsg))
 			return
 		}
-		log.Printf("Scrape succeeded, found: %s", scraped)
-		finalURL = scraped
+		log.Printf("Scrape succeeded: %s - %s", scraped.Title, scraped.Episode)
+		metadata = scraped
+	} else {
+		metadata = &models.VideoMetadata{
+			VideoURL: payload.URL,
+			Source:   extractDomainFromURL(payload.URL),
+		}
 	}
 
-	SetRoomVideo(room.RoomID, finalURL)
+	SetRoomMetadata(room.RoomID, metadata)
 
-	broadcastPayload := map[string]string{
-		"roomId": payload.RoomID,
-		"url":    finalURL,
+	broadcastPayload := map[string]interface{}{
+		"roomId":   payload.RoomID,
+		"videoUrl": metadata.VideoURL,
+		"metadata": metadata,
 	}
 	msg := models.Message{
 		Action:  "SET_VIDEO",
 		Payload: mustMarshalRaw(broadcastPayload),
 	}
 	BroadcastToRoom(room, mustMarshal(msg), nil)
+}
+
+func extractDomainFromURL(rawURL string) string {
+	parsed, err := neturl.Parse(rawURL)
+	if err != nil {
+		return ""
+	}
+	return parsed.Host
 }
 
 func mustMarshalRaw(v interface{}) json.RawMessage {
