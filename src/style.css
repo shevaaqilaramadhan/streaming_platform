@@ -6,31 +6,31 @@
 /* --- CSS Custom Properties (Design Tokens) --- */
 :root {
   /* Colors */
-  --color-bg-base:       #08080c;
-  --color-bg-surface:    #111116;
-  --color-bg-elevated:   #1a1a23;
-  --color-glass:         rgba(255, 255, 255, 0.03);
-  --color-glass-border:  rgba(255, 255, 255, 0.06);
-  --color-glass-hover:   rgba(255, 255, 255, 0.05);
+  --color-bg-base:       #0a0b10;
+  --color-bg-surface:    #12141c;
+  --color-bg-elevated:   #191c28;
+  --color-glass:         rgba(255, 255, 255, 0.02);
+  --color-glass-border:  rgba(255, 255, 255, 0.05);
+  --color-glass-hover:   rgba(255, 255, 255, 0.04);
 
   /* Brand Gradient */
-  --grad-brand: linear-gradient(135deg, hsl(330, 100%, 55%) 0%, hsl(345, 100%, 50%) 100%);
-  --grad-brand-subtle: linear-gradient(135deg, hsla(330, 100%, 55%, 0.15) 0%, hsla(345, 100%, 50%, 0.15) 100%);
-  --grad-glow:  linear-gradient(135deg, hsla(330, 100%, 55%, 0.3) 0%, hsla(345, 100%, 50%, 0.3) 100%);
+  --grad-brand: linear-gradient(135deg, hsl(195, 100%, 45%) 0%, hsl(215, 90%, 50%) 100%);
+  --grad-brand-subtle: linear-gradient(135deg, hsla(195, 100%, 45%, 0.08) 0%, hsla(215, 90%, 50%, 0.08) 100%);
+  --grad-glow:  linear-gradient(135deg, hsla(195, 100%, 45%, 0.2) 0%, hsla(215, 90%, 50%, 0.2) 100%);
 
   /* Accent Colors */
-  --color-primary:       hsl(330, 100%, 55%);
-  --color-primary-dim:   hsl(330, 80%, 42%);
-  --color-secondary:     hsl(345, 100%, 50%);
-  --color-accent-green:  hsl(140, 70%, 55%);
-  --color-accent-red:    hsl(0, 75%, 60%);
-  --color-accent-amber:  hsl(38, 95%, 58%);
+  --color-primary:       hsl(195, 100%, 45%);
+  --color-primary-dim:   hsl(195, 80%, 32%) ;
+  --color-secondary:     hsl(215, 90%, 50%);
+  --color-accent-green:  hsl(140, 70%, 50%);
+  --color-accent-red:    hsl(0, 75%, 55%);
+  --color-accent-amber:  hsl(38, 90%, 53%);
 
   /* Text */
-  --text-primary:    #f5f5fa;
-  --text-secondary:  rgba(245, 245, 250, 0.65);
-  --text-muted:      rgba(245, 245, 250, 0.35);
-  --text-inverse:    #08080c;
+  --text-primary:    #f2f4f8;
+  --text-secondary:  rgba(242, 244, 248, 0.65);
+  --text-muted:      rgba(242, 244, 248, 0.35);
+  --text-inverse:    #0a0b10;
 
   /* Spacing */
   --space-1: 0.25rem;
@@ -52,9 +52,9 @@
   --radius-full: 9999px;
 
   /* Shadows */
-  --shadow-glow-primary: 0 0 30px hsla(330, 100%, 55%, 0.25), 0 0 60px hsla(330, 100%, 55%, 0.1);
-  --shadow-glow-sm: 0 0 12px hsla(330, 100%, 55%, 0.2);
-  --shadow-card: 0 4px 24px rgba(0, 0, 0, 0.4), 0 1px 4px rgba(0,0,0,0.3);
+  --shadow-glow-primary: 0 0 30px hsla(195, 100%, 45%, 0.18), 0 0 60px hsla(195, 100%, 45%, 0.06);
+  --shadow-glow-sm: 0 0 12px hsla(195, 100%, 45%, 0.12);
+  --shadow-card: 0 10px 40px rgba(0, 0, 0, 0.55), 0 1px 3px rgba(0,0,0,0.3);
 
   /* Transitions */
   --transition-fast:   150ms cubic-bezier(0.4, 0, 0.2, 1);
@@ -230,7 +230,7 @@ a:hover { color: var(--color-secondary); }
 .input:focus {
   border-color: var(--color-primary);
   background: rgba(255,255,255,0.07);
-  box-shadow: 0 0 0 3px hsla(330, 100%, 55%, 0.15);
+  box-shadow: 0 0 0 3px hsla(195, 100%, 45%, 0.15);
 }
 
 /* --- Scrollbar --- */
@@ -252,8 +252,8 @@ a:hover { color: var(--color-secondary); }
   to   { opacity: 1; transform: scale(1); }
 }
 @keyframes pulse-glow {
-  0%, 100% { box-shadow: 0 0 0 0 hsla(330, 100%, 55%, 0.4); }
-  50%       { box-shadow: 0 0 0 8px hsla(330, 100%, 55%, 0); }
+  0%, 100% { box-shadow: 0 0 0 0 hsla(195, 100%, 45%, 0.4); }
+  50%       { box-shadow: 0 0 0 8px hsla(195, 100%, 45%, 0); }
 }
 @keyframes float {
   0%, 100% { transform: translateY(0px); }

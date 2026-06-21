@@ -202,21 +202,22 @@ function formatTime(ts) {
 .message {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 3px;
   animation: fadeIn 0.25s ease both;
 }
 
 .message-bubble {
-  background: rgba(255,255,255,0.04);
-  border: 1px solid rgba(255,255,255,0.06);
-  border-radius: var(--radius-md) var(--radius-md) var(--radius-md) 4px;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 14px 14px 14px 4px;
   padding: var(--space-2) var(--space-3);
-  max-width: 90%;
+  max-width: 85%;
+  transition: all var(--transition-base);
 }
 .message--own .message-bubble {
   background: var(--grad-brand-subtle);
-  border-color: hsla(330, 80%, 62%, 0.2);
-  border-radius: var(--radius-md) var(--radius-md) 4px var(--radius-md);
+  border-color: hsla(195, 100%, 45%, 0.2);
+  border-radius: 14px 14px 4px 14px;
   align-self: flex-end;
 }
 .message--own { align-items: flex-end; }

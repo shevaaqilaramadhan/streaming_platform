@@ -184,13 +184,13 @@ function onSendChat(text) {
 
 .room-layout {
   display: grid;
-  grid-template-columns: 1fr 360px;
+  grid-template-columns: 1fr 385px;
   grid-template-rows: 1fr;
-  gap: var(--space-4);
+  gap: var(--space-6);
   flex: 1;
-  padding: var(--space-4);
+  padding: var(--space-6);
   min-height: 0;
-  max-height: calc(100vh - 60px);
+  max-height: calc(100vh - 72px);
   overflow: hidden;
 }
 

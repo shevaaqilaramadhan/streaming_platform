@@ -18,8 +18,8 @@
               <circle cx="12" cy="7" r="4"/>
               <defs>
                 <linearGradient id="icon-grad" x1="0" y1="0" x2="24" y2="24" gradientUnits="userSpaceOnUse">
-                  <stop offset="0%" stop-color="hsl(330,100%,55%)"/>
-                  <stop offset="100%" stop-color="hsl(345,100%,50%)"/>
+                  <stop offset="0%" stop-color="hsl(195,100%,45%)"/>
+                  <stop offset="100%" stop-color="hsl(215,90%,50%)"/>
                 </linearGradient>
               </defs>
             </svg>
