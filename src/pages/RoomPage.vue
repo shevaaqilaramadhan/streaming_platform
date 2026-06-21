@@ -190,15 +190,18 @@ function onSendChat(text) {
   flex: 1;
   padding: var(--space-6);
   min-height: 0;
+  height: calc(100vh - 72px);
   max-height: calc(100vh - 72px);
   overflow: hidden;
 }
 
 .video-col {
   min-width: 0;
+  min-height: 0;
   display: flex;
   flex-direction: column;
   gap: var(--space-4);
+  overflow-y: auto;
 }
 
 /* Now Watching Header Styles */
@@ -332,8 +335,12 @@ function onSendChat(text) {
   .room-layout {
     grid-template-columns: 1fr;
     grid-template-rows: auto 1fr;
+    height: auto;
     max-height: none;
     overflow: auto;
+  }
+  .video-col {
+    overflow-y: visible;
   }
   .chat-col {
     height: 400px;
