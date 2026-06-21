@@ -25,8 +25,9 @@
       
       <div class="nav-right">
         <div class="nav-links">
-          <a href="#about" class="nav-link">About</a>
-          <a href="#docs" class="nav-link">Docs</a>
+          <a href="#docs" class="nav-link">Documentation</a>
+          <a href="#faq" class="nav-link">FAQ</a>
+          <a href="#status" class="nav-link">Server Status</a>
         </div>
         <button class="nav-profile-btn" aria-label="Profile">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
