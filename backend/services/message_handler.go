@@ -3,8 +3,28 @@ package services
 import (
 	"encoding/json"
 	"log"
+	neturl "net/url"
+	"strings"
 	"watchparty-backend/models"
 )
+
+func isYouTubeURL(url string) bool {
+	return strings.Contains(url, "youtube.com") ||
+		strings.Contains(url, "youtu.be")
+}
+
+func isDirectStreamURL(url string) bool {
+	lower := strings.ToLower(url)
+	parsed, err := neturl.Parse(lower)
+	if err != nil {
+		return false
+	}
+	path := parsed.Path
+	return strings.HasSuffix(path, ".mp4") ||
+		strings.HasSuffix(path, ".m3u8") ||
+		strings.HasSuffix(path, ".webm") ||
+		strings.HasSuffix(path, ".mkv")
+}
 
 func HandleMessage(user *models.User, room *models.WatchRoom, msgBytes []byte) {
 	var msg models.Message
@@ -111,14 +131,47 @@ func handleSetVideo(user *models.User, room *models.WatchRoom, payloadRaw json.R
 		return
 	}
 
-	SetRoomVideo(room.RoomID, payload.URL)
+	finalURL := payload.URL
 
-	msg := models.Message{
-		Action:  "SET_VIDEO",
-		Payload: payloadRaw,
+	if !isYouTubeURL(payload.URL) && !isDirectStreamURL(payload.URL) {
+		log.Printf("Scraping anime page: %s", payload.URL)
+		scraped, err := ScrapeStreamURL(payload.URL)
+		if err != nil {
+			log.Printf("Scrape failed for %s: %v", payload.URL, err)
+			errMsg := models.Message{
+				Action: "SCRAPE_ERROR",
+				Payload: mustMarshalRaw(models.ScrapeErrorPayload{
+					OriginalURL: payload.URL,
+					Error:       err.Error(),
+				}),
+			}
+			SendToUser(user, mustMarshal(errMsg))
+			return
+		}
+		log.Printf("Scrape succeeded, found: %s", scraped)
+		finalURL = scraped
 	}
 
+	SetRoomVideo(room.RoomID, finalURL)
+
+	broadcastPayload := map[string]string{
+		"roomId": payload.RoomID,
+		"url":    finalURL,
+	}
+	msg := models.Message{
+		Action:  "SET_VIDEO",
+		Payload: mustMarshalRaw(broadcastPayload),
+	}
 	BroadcastToRoom(room, mustMarshal(msg), nil)
+}
+
+func mustMarshalRaw(v interface{}) json.RawMessage {
+	data, err := json.Marshal(v)
+	if err != nil {
+		log.Println("Marshal error:", err)
+		return json.RawMessage("{}")
+	}
+	return data
 }
 
 func BroadcastToRoom(room *models.WatchRoom, message []byte, exclude *models.User) {

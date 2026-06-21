@@ -18,8 +18,8 @@
               <circle cx="12" cy="7" r="4"/>
               <defs>
                 <linearGradient id="icon-grad" x1="0" y1="0" x2="24" y2="24" gradientUnits="userSpaceOnUse">
-                  <stop offset="0%" stop-color="hsl(260,80%,62%)"/>
-                  <stop offset="100%" stop-color="hsl(220,85%,60%)"/>
+                  <stop offset="0%" stop-color="hsl(330,100%,55%)"/>
+                  <stop offset="100%" stop-color="hsl(345,100%,50%)"/>
                 </linearGradient>
               </defs>
             </svg>
@@ -53,7 +53,6 @@
               maxlength="24"
               autocomplete="off"
               spellcheck="false"
-              @keydown.enter="handleSubmit"
             />
             <div class="char-count" :class="{ 'near-limit': localNickname.length > 20 }">
               {{ localNickname.length }}/24
@@ -139,7 +138,7 @@ function handleSubmit() {
   height: 64px;
   border-radius: var(--radius-lg);
   background: var(--grad-brand-subtle);
-  border: 1px solid hsla(260, 80%, 62%, 0.25);
+  border: 1px solid hsla(330, 100%, 55%, 0.25);
   display: flex;
   align-items: center;
   justify-content: center;

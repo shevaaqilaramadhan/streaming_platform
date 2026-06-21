@@ -7,12 +7,13 @@ import { ref, computed, onMounted, watch } from 'vue'
 import { useWebSocket } from './useWebSocket.js'
 
 export const MSG_TYPES = {
-  SYNC_EVENT:  'SYNC_EVENT',
-  CHAT_EVENT:  'CHAT_EVENT',
-  JOIN_EVENT:  'JOIN_EVENT',
-  ROOM_INIT:   'ROOM_INIT',
-  SET_VIDEO:   'SET_VIDEO',
-  USER_LEFT:   'USER_LEFT',
+  SYNC_EVENT:   'SYNC_EVENT',
+  CHAT_EVENT:   'CHAT_EVENT',
+  JOIN_EVENT:   'JOIN_EVENT',
+  ROOM_INIT:    'ROOM_INIT',
+  SET_VIDEO:    'SET_VIDEO',
+  USER_LEFT:    'USER_LEFT',
+  SCRAPE_ERROR: 'SCRAPE_ERROR',
 }
 
 export function useRoom(roomId, nickname, isHost) {
@@ -27,6 +28,9 @@ export function useRoom(roomId, nickname, isHost) {
     currentTime: 0,
     isPlaying: false,
   })
+
+  /* ---- Scrape Error State ---- */
+  const scrapeError = ref(null)
 
   /* ---- Participants ---- */
   const participants = ref([])
@@ -110,6 +114,17 @@ export function useRoom(roomId, nickname, isHost) {
         playerState.value.videoUrl    = data.payload.url
         playerState.value.currentTime = 0
         playerState.value.isPlaying   = false
+        scrapeError.value = null  // clear previous error on successful video load
+        break
+
+      case MSG_TYPES.SCRAPE_ERROR:
+        scrapeError.value = {
+          originalUrl: data.payload.originalUrl,
+          error:       data.payload.error,
+        }
+        console.error('[Scrape] Failed:', data.payload.error, 'URL:', data.payload.originalUrl)
+        // Auto-clear after 8 seconds
+        setTimeout(() => { scrapeError.value = null }, 8000)
         break
 
       default:
@@ -170,6 +185,7 @@ export function useRoom(roomId, nickname, isHost) {
     messages,
     playerState,
     participants,
+    scrapeError,
     joinRoom,
     leave,
     sendChatMessage,

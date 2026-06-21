@@ -1,5 +1,5 @@
 <template>
-  <div class="video-wrapper" :class="{ 'is-loading': isLoading }">
+  <div ref="wrapperRef" class="video-wrapper" :class="{ 'is-loading': isLoading }">
     <!-- Loading overlay -->
     <Transition name="fade">
       <div v-if="isLoading && videoUrl" class="video-loading">
@@ -16,28 +16,34 @@
           <rect x="1" y="5" width="15" height="14" rx="2" ry="2"/>
         </svg>
       </div>
-      <p v-if="isHost" class="placeholder-text">Set a video URL below to start watching</p>
+      <p v-if="isHost" class="placeholder-text">Paste a YouTube URL, stream link, or anime page URL</p>
       <p v-else class="placeholder-text">Waiting for the host to start a video…</p>
     </div>
 
-    <!-- Actual video element -->
+    <!-- YouTube iframe container -->
+    <div v-show="videoUrl && videoMode === 'youtube'" class="player-container">
+      <div id="youtube-player"></div>
+    </div>
+
+    <!-- Native HTML5 video element (for HLS & MP4) -->
     <video
-      v-show="videoUrl"
+      v-show="videoUrl && videoMode !== 'youtube'"
       ref="videoRef"
       id="watch-party-video"
       class="video-el"
-      :src="videoUrl || undefined"
       preload="metadata"
       playsinline
-      @timeupdate="onTimeUpdate"
-      @play="onPlay"
-      @pause="onPause"
-      @seeking="onSeeking"
+      crossorigin="anonymous"
+      referrerpolicy="no-referrer"
+      @timeupdate="onNativeTimeUpdate"
+      @play="onNativePlay"
+      @pause="onNativePause"
+      @seeking="onNativeSeeking"
       @loadstart="isLoading = true"
       @canplay="isLoading = false"
       @waiting="isLoading = true"
       @playing="isLoading = false"
-      @loadedmetadata="onLoadedMetadata"
+      @loadedmetadata="onNativeLoadedMetadata"
     ></video>
 
     <!-- Custom controls overlay -->
@@ -143,6 +149,11 @@
             <!-- Spacer -->
             <span style="flex:1"></span>
 
+            <!-- Stream mode badge -->
+            <span v-if="videoMode" class="stream-badge" :data-tooltip="streamTooltip">
+              {{ videoMode === 'youtube' ? 'YT' : videoMode === 'hls' ? 'HLS' : 'MP4' }}
+            </span>
+
             <!-- Host indicator for guests -->
             <span v-if="!isHost" class="guest-indicator">
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -185,7 +196,7 @@
         v-model="newVideoUrl"
         type="url"
         class="input"
-        placeholder="Paste a direct .mp4 video URL…"
+        placeholder="YouTube URL, .m3u8 stream, .mp4 link, or anime page URL…"
         @keydown.enter="submitVideoUrl"
       />
       <button
@@ -205,6 +216,7 @@
 
 <script setup>
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
+import Hls from 'hls.js'
 
 const props = defineProps({
   isHost:      { type: Boolean, default: false },
@@ -214,108 +226,375 @@ const props = defineProps({
 
 const emit = defineEmits(['sync', 'set-video'])
 
-/* ---- Refs ---- */
-const videoRef   = ref(null)
-const isPlaying  = ref(false)
-const isLoading  = ref(false)
-const isMuted    = ref(false)
+/* ================================================================
+   State
+   ================================================================ */
+const wrapperRef   = ref(null)
+const videoRef     = ref(null)
+const isPlaying    = ref(false)
+const isLoading    = ref(false)
+const isMuted      = ref(false)
 const isFullscreen = ref(false)
-const volume     = ref(1)
-const currentTime = ref(0)
-const duration   = ref(0)
+const volume       = ref(1)
+const currentTime  = ref(0)
+const duration     = ref(0)
 const showControls = ref(true)
 const showPlayPulse = ref(false)
 const newVideoUrl  = ref('')
 const pendingSeekTime = ref(null)
-let controlsTimer = null
-let isSeeking = false
-let lastSyncTime = 0
+const videoMode    = ref(null)  // 'youtube' | 'hls' | 'native'
 
-/* ---- Computed ---- */
+let ytPlayer = null         // YouTube IFrame player instance
+let hlsInstance = null       // hls.js instance
+let controlsTimer = null
+let lastSyncTime = 0
+let timeUpdateTimer = null
+let ignoreStateChange = false
+
+/* ================================================================
+   Computed
+   ================================================================ */
 const progressPercent = computed(() => {
   if (!duration.value) return 0
   return (currentTime.value / duration.value) * 100
 })
 
-/* ---- Watch incoming player state from WebSocket (guests only) ---- */
-watch(
-  () => props.playerState,
-  (state) => {
-    if (!videoRef.value || props.isHost) return
-    const vid = videoRef.value
+const streamTooltip = computed(() => {
+  if (videoMode.value === 'youtube') return 'YouTube IFrame Player'
+  if (videoMode.value === 'hls') return 'HLS stream via hls.js'
+  return 'Native HTML5 video'
+})
 
-    // Sync time if drift > 1s
-    if (Math.abs(vid.currentTime - state.currentTime) > 1) {
-      if (vid.readyState >= 1) { // HAVE_METADATA or higher
-        vid.currentTime = state.currentTime
-      } else {
-        // Delay seek until metadata is loaded
-        pendingSeekTime.value = state.currentTime
-      }
+/* ================================================================
+   URL Detection Helpers
+   ================================================================ */
+function extractYoutubeId(url) {
+  if (!url) return null
+  const trimmed = url.trim()
+  if (trimmed.length === 11 && /^[a-zA-Z0-9_-]{11}$/.test(trimmed)) return trimmed
+  const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=)([^#&?]*).*/
+  const match = trimmed.match(regExp)
+  return (match && match[2].length === 11) ? match[2] : null
+}
+
+function isHlsUrl(url) {
+  if (!url) return false
+  const clean = url.split('?')[0].split('#')[0]
+  return clean.endsWith('.m3u8')
+}
+
+function detectMode(url) {
+  if (!url) return null
+  if (extractYoutubeId(url)) return 'youtube'
+  if (isHlsUrl(url)) return 'hls'
+  return 'native'  // .mp4 or any other direct URL
+}
+
+/* ================================================================
+   YouTube IFrame Player API
+   ================================================================ */
+let apiLoadedPromise = null
+function loadYoutubeApi() {
+  if (apiLoadedPromise) return apiLoadedPromise
+  apiLoadedPromise = new Promise((resolve) => {
+    if (window.YT && window.YT.Player) { resolve(window.YT); return }
+    const prev = window.onYouTubeIframeAPIReady
+    window.onYouTubeIframeAPIReady = () => { if (prev) prev(); resolve(window.YT) }
+    const tag = document.createElement('script')
+    tag.src = 'https://www.youtube.com/iframe_api'
+    const first = document.getElementsByTagName('script')[0]
+    first.parentNode.insertBefore(tag, first)
+  })
+  return apiLoadedPromise
+}
+
+async function initYoutube(videoId) {
+  isLoading.value = true
+  const YT = await loadYoutubeApi()
+
+  let target = document.getElementById('youtube-player')
+  if (!target) {
+    const container = document.querySelector('.player-container')
+    if (container) {
+      target = document.createElement('div')
+      target.id = 'youtube-player'
+      container.appendChild(target)
     }
+  }
 
-    if (state.isPlaying && vid.paused) {
-      vid.play().catch(() => {})
-    } else if (!state.isPlaying && !vid.paused) {
-      vid.pause()
-    }
-  },
-  { deep: true }
-)
+  if (ytPlayer) {
+    try { ytPlayer.destroy() } catch (e) { console.warn('[YT] destroy error:', e) }
+    ytPlayer = null
+  }
 
-watch(
-  () => props.videoUrl,
-  () => {
+  ytPlayer = new YT.Player('youtube-player', {
+    height: '100%', width: '100%',
+    videoId,
+    playerVars: { autoplay: 0, controls: 0, rel: 0, modestbranding: 1, fs: 0, disablekb: 1, iv_load_policy: 3 },
+    events: { onReady: onYtReady, onStateChange: onYtStateChange },
+  })
+}
+
+function onYtReady() {
+  isLoading.value = false
+  duration.value = ytPlayer.getDuration() || 0
+  ytPlayer.setVolume(volume.value * 100)
+  if (isMuted.value) ytPlayer.mute()
+
+  if (pendingSeekTime.value !== null) {
+    ytPlayer.seekTo(pendingSeekTime.value, true)
+    currentTime.value = pendingSeekTime.value
     pendingSeekTime.value = null
   }
-)
-
-/* ---- Video Event Handlers ---- */
-function onLoadedMetadata() {
-  if (videoRef.value && pendingSeekTime.value !== null) {
-    videoRef.value.currentTime = pendingSeekTime.value
-    pendingSeekTime.value = null
+  if (!props.isHost) {
+    ignoreStateChange = true
+    props.playerState.isPlaying ? ytPlayer.playVideo() : ytPlayer.pauseVideo()
+    setTimeout(() => { ignoreStateChange = false }, 200)
   }
 }
 
-function onTimeUpdate() {
-  if (!videoRef.value) return
-  currentTime.value = videoRef.value.currentTime
-  duration.value    = videoRef.value.duration || 0
+function onYtStateChange(event) {
+  if (!ytPlayer) return
+  const state = event.data
+  const time = ytPlayer.getCurrentTime()
+  if (state === 1) {
+    isPlaying.value = true; startYtTimePolling()
+    if (props.isHost && !ignoreStateChange) emit('sync', { isPlaying: true, currentTime: time })
+  } else {
+    isPlaying.value = false; stopYtTimePolling()
+    if (state === 2 && props.isHost && !ignoreStateChange) emit('sync', { isPlaying: false, currentTime: time })
+  }
+}
 
-  // Throttle sync events to avoid flooding
+function startYtTimePolling() {
+  stopYtTimePolling()
+  timeUpdateTimer = setInterval(() => {
+    if (!ytPlayer) return
+    currentTime.value = ytPlayer.getCurrentTime()
+    duration.value = ytPlayer.getDuration() || 0
+    if (props.isHost && Date.now() - lastSyncTime > 2000) {
+      lastSyncTime = Date.now()
+      if (ytPlayer.getPlayerState() === 1) emit('sync', { isPlaying: true, currentTime: currentTime.value })
+    }
+  }, 500)
+}
+
+function stopYtTimePolling() {
+  if (timeUpdateTimer) { clearInterval(timeUpdateTimer); timeUpdateTimer = null }
+}
+
+/* ================================================================
+   HLS via hls.js
+   ================================================================ */
+function initHls(url) {
+  destroyHls()
+  const vid = videoRef.value
+  if (!vid) return
+
+  isLoading.value = true
+
+  if (Hls.isSupported()) {
+    hlsInstance = new Hls({
+      xhrSetup: (xhr) => {
+        // Prevent referrer leaking which causes 403 on some anime CDNs
+        xhr.setRequestHeader && void 0 // no-op; referrerpolicy on <video> handles it
+      }
+    })
+    hlsInstance.loadSource(url)
+    hlsInstance.attachMedia(vid)
+    hlsInstance.on(Hls.Events.MANIFEST_PARSED, () => {
+      isLoading.value = false
+      if (pendingSeekTime.value !== null) {
+        vid.currentTime = pendingSeekTime.value
+        pendingSeekTime.value = null
+      }
+      if (!props.isHost && props.playerState.isPlaying) {
+        vid.play().catch(() => {})
+      }
+    })
+    hlsInstance.on(Hls.Events.ERROR, (_, data) => {
+      console.error('[HLS] Error:', data)
+      if (data.fatal) {
+        switch (data.type) {
+          case Hls.ErrorTypes.NETWORK_ERROR:
+            console.warn('[HLS] Fatal network error — attempting recovery…')
+            hlsInstance.startLoad()
+            break
+          case Hls.ErrorTypes.MEDIA_ERROR:
+            console.warn('[HLS] Fatal media error — attempting recovery…')
+            hlsInstance.recoverMediaError()
+            break
+          default:
+            console.error('[HLS] Unrecoverable error, destroying instance')
+            destroyHls()
+            break
+        }
+      }
+    })
+  } else if (vid.canPlayType('application/vnd.apple.mpegurl')) {
+    // Safari native HLS support
+    vid.src = url
+    isLoading.value = false
+  } else {
+    console.error('[HLS] This browser does not support HLS playback')
+    isLoading.value = false
+  }
+}
+
+function destroyHls() {
+  if (hlsInstance) {
+    hlsInstance.destroy()
+    hlsInstance = null
+  }
+}
+
+/* ================================================================
+   Native HTML5 <video> (direct MP4, etc.)
+   ================================================================ */
+function initNative(url) {
+  const vid = videoRef.value
+  if (!vid) return
+  isLoading.value = true
+  vid.src = url
+  vid.load()
+}
+
+/* ================================================================
+   Native <video> Event Handlers (shared by HLS and Native modes)
+   ================================================================ */
+function onNativeTimeUpdate() {
+  const vid = videoRef.value
+  if (!vid) return
+  currentTime.value = vid.currentTime
+  duration.value = vid.duration || 0
+
   if (props.isHost && Date.now() - lastSyncTime > 2000) {
     lastSyncTime = Date.now()
-    // Only emit if playing (seeking emits its own)
-    if (!videoRef.value.paused) {
-      emit('sync', { isPlaying: true, currentTime: videoRef.value.currentTime })
-    }
+    if (!vid.paused) emit('sync', { isPlaying: true, currentTime: vid.currentTime })
   }
 }
 
-function onPlay() {
+function onNativePlay() {
   isPlaying.value = true
   if (props.isHost) emit('sync', { isPlaying: true, currentTime: videoRef.value?.currentTime || 0 })
 }
 
-function onPause() {
+function onNativePause() {
   isPlaying.value = false
   if (props.isHost) emit('sync', { isPlaying: false, currentTime: videoRef.value?.currentTime || 0 })
 }
 
-function onSeeking() {
+function onNativeSeeking() {
   if (props.isHost) {
     emit('sync', { isPlaying: !videoRef.value?.paused, currentTime: videoRef.value?.currentTime || 0 })
   }
 }
 
-/* ---- Controls ---- */
-function togglePlay() {
-  if (!props.isHost || !videoRef.value) return
-  if (videoRef.value.paused) {
-    videoRef.value.play().catch(() => {})
-  } else {
+function onNativeLoadedMetadata() {
+  const vid = videoRef.value
+  if (vid && pendingSeekTime.value !== null) {
+    vid.currentTime = pendingSeekTime.value
+    pendingSeekTime.value = null
+  }
+}
+
+/* ================================================================
+   Unified Player Lifecycle
+   ================================================================ */
+function destroyAllPlayers() {
+  // YouTube
+  if (ytPlayer) {
+    try { ytPlayer.destroy() } catch (e) { /* noop */ }
+    ytPlayer = null
+  }
+  stopYtTimePolling()
+
+  // HLS
+  destroyHls()
+
+  // Native
+  if (videoRef.value) {
     videoRef.value.pause()
+    videoRef.value.removeAttribute('src')
+    videoRef.value.load()
+  }
+}
+
+function loadVideo(url) {
+  destroyAllPlayers()
+  pendingSeekTime.value = null
+
+  const mode = detectMode(url)
+  videoMode.value = mode
+
+  if (!mode) return
+
+  switch (mode) {
+    case 'youtube':
+      initYoutube(extractYoutubeId(url))
+      break
+    case 'hls':
+      initHls(url)
+      break
+    case 'native':
+      initNative(url)
+      break
+  }
+}
+
+/* ================================================================
+   Watch: Incoming player state from WebSocket (guests)
+   ================================================================ */
+watch(
+  () => props.playerState,
+  (state) => {
+    if (props.isHost) return
+
+    if (videoMode.value === 'youtube') {
+      if (!ytPlayer || typeof ytPlayer.getPlayerState !== 'function') return
+      ignoreStateChange = true
+      const ytState = ytPlayer.getPlayerState()
+      if (state.isPlaying) { if (ytState !== 1) ytPlayer.playVideo() }
+      else { if (ytState !== 2) ytPlayer.pauseVideo() }
+      const ytTime = ytPlayer.getCurrentTime()
+      if (Math.abs(ytTime - state.currentTime) > 1.5) {
+        ytPlayer.seekTo(state.currentTime, true)
+        currentTime.value = state.currentTime
+      }
+      setTimeout(() => { ignoreStateChange = false }, 200)
+    } else {
+      // HLS or Native — both use the same <video> element
+      const vid = videoRef.value
+      if (!vid) return
+      if (Math.abs(vid.currentTime - state.currentTime) > 1) {
+        if (vid.readyState >= 1) {
+          vid.currentTime = state.currentTime
+        } else {
+          pendingSeekTime.value = state.currentTime
+        }
+      }
+      if (state.isPlaying && vid.paused) vid.play().catch(() => {})
+      else if (!state.isPlaying && !vid.paused) vid.pause()
+    }
+  },
+  { deep: true }
+)
+
+watch(() => props.videoUrl, (newUrl) => { loadVideo(newUrl) })
+
+/* ================================================================
+   Unified Controls
+   ================================================================ */
+function togglePlay() {
+  if (!props.isHost) return
+
+  if (videoMode.value === 'youtube') {
+    if (!ytPlayer) return
+    ytPlayer.getPlayerState() === 1 ? ytPlayer.pauseVideo() : ytPlayer.playVideo()
+  } else {
+    const vid = videoRef.value
+    if (!vid) return
+    vid.paused ? vid.play().catch(() => {}) : vid.pause()
   }
   flashPlayPulse()
 }
@@ -326,34 +605,48 @@ function flashPlayPulse() {
 }
 
 function toggleMute() {
-  if (!videoRef.value) return
   isMuted.value = !isMuted.value
-  videoRef.value.muted = isMuted.value
+  if (videoMode.value === 'youtube' && ytPlayer) {
+    isMuted.value ? ytPlayer.mute() : ytPlayer.unMute()
+  } else if (videoRef.value) {
+    videoRef.value.muted = isMuted.value
+  }
 }
 
 function onVolumeChange() {
-  if (!videoRef.value) return
-  videoRef.value.volume = volume.value
-  isMuted.value = volume.value === 0
+  if (videoMode.value === 'youtube' && ytPlayer) {
+    ytPlayer.setVolume(volume.value * 100)
+    isMuted.value = volume.value === 0
+    isMuted.value ? ytPlayer.mute() : ytPlayer.unMute()
+  } else if (videoRef.value) {
+    videoRef.value.volume = volume.value
+    isMuted.value = volume.value === 0
+  }
 }
 
 function onSeek(event) {
-  if (!videoRef.value || !props.isHost) return
+  if (!props.isHost) return
   const bar = event.currentTarget
   const rect = bar.getBoundingClientRect()
   const ratio = Math.max(0, Math.min(1, (event.clientX - rect.left) / rect.width))
-  videoRef.value.currentTime = ratio * duration.value
+  const targetTime = ratio * duration.value
+
+  if (videoMode.value === 'youtube' && ytPlayer) {
+    ytPlayer.seekTo(targetTime, true)
+  } else if (videoRef.value) {
+    videoRef.value.currentTime = targetTime
+  }
+  currentTime.value = targetTime
+  emit('sync', { isPlaying: isPlaying.value, currentTime: targetTime })
 }
 
 function toggleFullscreen() {
-  const el = videoRef.value?.parentElement
+  const el = wrapperRef.value
   if (!el) return
   if (!document.fullscreenElement) {
-    el.requestFullscreen()
-    isFullscreen.value = true
+    el.requestFullscreen(); isFullscreen.value = true
   } else {
-    document.exitFullscreen()
-    isFullscreen.value = false
+    document.exitFullscreen(); isFullscreen.value = false
   }
 }
 
@@ -376,7 +669,6 @@ function submitVideoUrl() {
   newVideoUrl.value = ''
 }
 
-/* ---- Format time helper ---- */
 function formatTime(secs) {
   if (!secs || isNaN(secs)) return '0:00'
   const m = Math.floor(secs / 60)
@@ -384,7 +676,17 @@ function formatTime(secs) {
   return `${m}:${s}`
 }
 
-onUnmounted(() => clearTimeout(controlsTimer))
+/* ================================================================
+   Lifecycle
+   ================================================================ */
+onMounted(() => {
+  if (props.videoUrl) loadVideo(props.videoUrl)
+})
+
+onUnmounted(() => {
+  destroyAllPlayers()
+  clearTimeout(controlsTimer)
+})
 </script>
 
 <style scoped>
@@ -399,6 +701,20 @@ onUnmounted(() => clearTimeout(controlsTimer))
   box-shadow: var(--shadow-card), var(--shadow-glow-sm);
 }
 
+/* Player Container & IFrame sizing */
+.player-container {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  background: #000;
+}
+.player-container :deep(iframe) {
+  width: 100% !important;
+  height: 100% !important;
+  display: block;
+  border: none;
+}
+
+/* Native video element */
 .video-el {
   width: 100%;
   aspect-ratio: 16 / 9;
@@ -416,7 +732,7 @@ onUnmounted(() => clearTimeout(controlsTimer))
   align-items: center;
   justify-content: center;
   gap: var(--space-4);
-  background: radial-gradient(ellipse at center, rgba(80,60,140,0.15) 0%, #000 70%);
+  background: radial-gradient(ellipse at center, rgba(255, 46, 147, 0.15) 0%, #000 70%);
 }
 .placeholder-icon {
   color: rgba(255,255,255,0.15);
@@ -558,6 +874,20 @@ onUnmounted(() => clearTimeout(controlsTimer))
   width: 80px;
   accent-color: var(--color-primary);
   cursor: pointer;
+}
+
+.stream-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: var(--radius-full);
+  font-size: 0.625rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--color-primary);
+  background: hsla(330, 100%, 55%, 0.12);
+  border: 1px solid hsla(330, 100%, 55%, 0.25);
 }
 
 .guest-indicator {

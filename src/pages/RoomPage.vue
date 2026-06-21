@@ -56,6 +56,20 @@
         Lost connection to the room. Attempting to reconnect…
       </div>
     </Transition>
+
+    <!-- Scrape error toast -->
+    <Transition name="slide-up">
+      <div v-if="scrapeError" class="scrape-error-toast glass" role="alert">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/>
+        </svg>
+        <div class="scrape-error-text">
+          <strong>Failed to extract stream</strong>
+          <span>{{ scrapeError.error }}</span>
+        </div>
+        <button class="scrape-error-dismiss" @click="scrapeError = null" aria-label="Dismiss">&times;</button>
+      </div>
+    </Transition>
   </div>
 </template>
 
@@ -85,6 +99,7 @@ const wsStatus     = ref('disconnected')
 const messages     = ref([])
 const playerState  = ref({ videoUrl: '', currentTime: 0, isPlaying: false })
 const participants = ref([])
+const scrapeError  = ref(null)
 const isConnected  = computed(() => wsStatus.value === 'connected')
 
 function initRoom() {
@@ -100,6 +115,7 @@ function initRoom() {
   watch(room.messages,     v => { messages.value    = v }, { deep: true })
   watch(room.playerState,  v => { playerState.value = v }, { deep: true })
   watch(room.participants, v => { participants.value = v }, { deep: true })
+  watch(room.scrapeError,  v => { scrapeError.value  = v })
 
   room.joinRoom()
 }
@@ -184,6 +200,52 @@ function onSendChat(text) {
   white-space: nowrap;
   z-index: var(--z-toast);
   box-shadow: var(--shadow-card);
+}
+
+/* Scrape error toast */
+.scrape-error-toast {
+  position: fixed;
+  bottom: var(--space-6);
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-5);
+  border-radius: var(--radius-lg);
+  font-size: 0.875rem;
+  color: var(--color-primary);
+  border-color: hsla(330, 100%, 55%, 0.3) !important;
+  background: rgba(14, 14, 28, 0.95) !important;
+  z-index: var(--z-toast);
+  box-shadow: var(--shadow-card), 0 0 20px hsla(330, 100%, 55%, 0.15);
+  max-width: 500px;
+}
+.scrape-error-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.scrape-error-text strong {
+  font-size: 0.8125rem;
+  color: white;
+}
+.scrape-error-text span {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  word-break: break-word;
+}
+.scrape-error-dismiss {
+  background: none;
+  border: none;
+  color: rgba(255,255,255,0.4);
+  font-size: 1.25rem;
+  cursor: pointer;
+  padding: 0 4px;
+  transition: color var(--transition-fast);
+}
+.scrape-error-dismiss:hover {
+  color: white;
 }
 
 /* Responsive */

@@ -121,7 +121,7 @@ function sendMessage() {
 
 /* Deterministic colour per username */
 const USER_COLORS = [
-  'hsl(260,70%,72%)', 'hsl(200,80%,65%)', 'hsl(160,60%,60%)',
+  'hsl(330,70%,72%)', 'hsl(200,80%,65%)', 'hsl(160,60%,60%)',
   'hsl(30,90%,65%)',  'hsl(340,70%,68%)', 'hsl(50,90%,62%)',
   'hsl(290,65%,70%)', 'hsl(180,65%,60%)',
 ]
@@ -215,7 +215,7 @@ function formatTime(ts) {
 }
 .message--own .message-bubble {
   background: var(--grad-brand-subtle);
-  border-color: hsla(260, 80%, 62%, 0.2);
+  border-color: hsla(330, 80%, 62%, 0.2);
   border-radius: var(--radius-md) var(--radius-md) 4px var(--radius-md);
   align-self: flex-end;
 }

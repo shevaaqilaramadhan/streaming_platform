@@ -158,7 +158,7 @@ The backend should:
 
 ### 5. `SET_VIDEO`
 **Direction:** Client (host only) → Server → broadcast to all clients  
-**When:** Host pastes a new video URL.
+**When:** Host pastes a new video URL (YouTube, direct .mp4/.m3u8, **or an anime page URL**).
 
 **Client sends:**
 ```json
@@ -166,15 +166,49 @@ The backend should:
   "action": "SET_VIDEO",
   "payload": {
     "roomId": "xyz123",
-    "url":    "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4"
+    "url":    "https://otakudesu.blog/episode/some-episode-slug/"
   }
 }
 ```
 
+The `url` field can be one of:
+1. **YouTube URL** — e.g. `https://www.youtube.com/watch?v=dQw4w9WgXcQ`
+2. **Direct stream** — e.g. `https://cdn.example.com/video.m3u8` or `https://cdn.example.com/video.mp4`
+3. **Anime page URL** — any URL that is NOT a YouTube/direct file link
+
 **Server should:**
-- Update `WatchRoom.CurrentVideo`
-- Reset `CurrentTime` to 0 and `IsPlaying` to false
-- Broadcast to all clients
+
+1. **Detect URL type:**
+   - If the URL is a YouTube link or a direct `.mp4`/`.m3u8` file → skip scraping, treat as final URL
+   - Otherwise → invoke the **scraper service** to resolve the embedded stream
+
+2. **Scraper flow (for anime page URLs):**
+   - Call `scraper.ScrapeStreamURL(url)` (see `BACKEND_SCRAPER_TASK.md`)
+   - If scraping succeeds, replace `payload.url` with the resolved `.m3u8` URL
+   - If scraping fails, broadcast a `SCRAPE_ERROR` event (see below)
+
+3. **After URL is resolved:**
+   - Update `WatchRoom.CurrentVideo` with the final URL
+   - Reset `CurrentTime` to 0 and `IsPlaying` to false
+   - Broadcast `SET_VIDEO` to all clients with the resolved URL
+
+---
+
+### 5b. `SCRAPE_ERROR` (new)
+**Direction:** Server → sender client only  
+**When:** The scraper fails to resolve a stream URL from the given page.
+
+```json
+{
+  "action": "SCRAPE_ERROR",
+  "payload": {
+    "originalUrl": "https://otakudesu.blog/episode/some-slug/",
+    "error":       "Could not find video iframe on page"
+  }
+}
+```
+
+The frontend will display a toast/notification with the error message. No room state is changed.
 
 ---
 

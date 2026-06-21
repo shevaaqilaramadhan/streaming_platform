@@ -23,3 +23,25 @@ This document summarizes the completed frontend tasks and optimizations implemen
 * **Description**: Added a queue mechanism (`pendingSeekTime`) to prevent setting `currentTime` before the video metadata is loaded.
 * **Why**: Setting `currentTime` on an HTML5 `<video>` element whose `readyState` is `< HAVE_METADATA` is ignored or reset by the browser. If a guest joined a room where a video was already playing, they would remain stuck at `0:00`. The new logic checks if the player is ready; if not, it queues the seek time and executes it precisely when the browser fires the `@loadedmetadata` event.
 * **Cleanup**: Watches `videoUrl` and resets the `pendingSeekTime` whenever a new video url is loaded, preventing seek-pollution from previous videos.
+
+---
+
+## 4. Brand Redesign — Electric Pink & Interactive Constellation
+* **Files Modified/Created**:
+  - [style.css](file:///home/litcq/streaming_platform/src/style.css) (CSS Design Tokens)
+  - [ConstellationBackground.vue](file:///home/litcq/streaming_platform/src/components/ConstellationBackground.vue) (Particle system canvas background)
+  - [App.vue](file:///home/litcq/streaming_platform/src/App.vue) (Global integration)
+  - Components/Pages: [VideoPlayer.vue](file:///home/litcq/streaming_platform/src/components/VideoPlayer.vue), [ChatPanel.vue](file:///home/litcq/streaming_platform/src/components/ChatPanel.vue), [RoomHeader.vue](file:///home/litcq/streaming_platform/src/components/RoomHeader.vue), [NicknameModal.vue](file:///home/litcq/streaming_platform/src/components/NicknameModal.vue), [HomePage.vue](file:///home/litcq/streaming_platform/src/pages/HomePage.vue)
+  - **Interactive Constellation Canvas**: Created a high-performance background canvas drawing interactive floating particles (electric pink nodes) that link together in a constellation style when within range. Adds cursor magnetism lines by tracking pointer coords on the body window, all while utilizing `pointer-events: none` to keep the front-facing layout fully clickable.
+
+---
+
+## 5. YouTube IFrame Player API Integration
+* **File Modified**: [VideoPlayer.vue](file:///home/litcq/streaming_platform/src/components/VideoPlayer.vue)
+* **Description**:
+  - **Dynamic Loading**: Loads the official YouTube iframe player API library dynamically using a Promise-based helper, preventing redundant script injections.
+  - **Customized YouTube Player**: Injects a custom YouTube player (disabling native controls, branding annotations, related videos, etc.) that integrates perfectly with the existing premium, neon electric pink HTML5 control overlay.
+  - **Synchronized Playback**: Hooks into YouTube’s native event listeners (`onStateChange` for `PLAYING` and `PAUSED` states). The host's plays, pauses, and seek events are captured and dispatched through WebSockets to keep all connected participants in frame-perfect alignment.
+  - **Custom Time Polling**: Implements a high-frequency polling timer (every 500ms) during active playback to fetch current timestamp values since YouTube does not have a native `timeupdate` event.
+
+

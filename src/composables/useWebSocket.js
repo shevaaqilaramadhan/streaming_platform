@@ -109,7 +109,32 @@ export function useWebSocket(roomId) {
     }
   }
 
-  onUnmounted(disconnect)
+  // Handle browser online/offline events for auto-reconnection
+  const handleOnline = () => {
+    if (!intentionalClose && (!ws.value || ws.value.readyState !== WebSocket.OPEN)) {
+      console.log('[WS] Internet connection restored. Reconnecting WebSocket immediately...')
+      reconnectAttempts = 0
+      clearTimeout(reconnectTimer)
+      connect()
+    }
+  }
+
+  const handleOffline = () => {
+    console.warn('[WS] Internet connection lost.')
+  }
+
+  if (typeof window !== 'undefined') {
+    window.addEventListener('online', handleOnline)
+    window.addEventListener('offline', handleOffline)
+  }
+
+  onUnmounted(() => {
+    disconnect()
+    if (typeof window !== 'undefined') {
+      window.removeEventListener('online', handleOnline)
+      window.removeEventListener('offline', handleOffline)
+    }
+  })
 
   return {
     status,

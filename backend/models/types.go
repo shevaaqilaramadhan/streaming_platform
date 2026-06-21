@@ -78,3 +78,8 @@ type JoinBroadcastPayload struct {
 	UserID   string `json:"userId"`
 	Username string `json:"username"`
 }
+
+type ScrapeErrorPayload struct {
+	OriginalURL string `json:"originalUrl"`
+	Error       string `json:"error"`
+}

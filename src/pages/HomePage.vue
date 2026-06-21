@@ -15,8 +15,8 @@
           <polygon points="11,9 21,14 11,19" fill="white"/>
           <defs>
             <linearGradient id="nav-logo-grad" x1="0" y1="0" x2="28" y2="28">
-              <stop offset="0%" stop-color="hsl(260,80%,62%)"/>
-              <stop offset="100%" stop-color="hsl(220,85%,60%)"/>
+              <stop offset="0%" stop-color="hsl(330,100%,55%)"/>
+              <stop offset="100%" stop-color="hsl(345,100%,50%)"/>
             </linearGradient>
           </defs>
         </svg>
@@ -237,19 +237,19 @@ const steps = [
 }
 .orb-1 {
   width: 600px; height: 600px;
-  background: radial-gradient(circle, hsl(260,80%,50%) 0%, transparent 70%);
+  background: radial-gradient(circle, hsl(330,100%,50%) 0%, transparent 70%);
   top: -200px; left: -200px;
   animation: orb-move-1 18s ease-in-out infinite;
 }
 .orb-2 {
   width: 500px; height: 500px;
-  background: radial-gradient(circle, hsl(220,85%,55%) 0%, transparent 70%);
+  background: radial-gradient(circle, hsl(345,100%,50%) 0%, transparent 70%);
   bottom: -100px; right: -150px;
   animation: orb-move-2 22s ease-in-out infinite;
 }
 .orb-3 {
   width: 350px; height: 350px;
-  background: radial-gradient(circle, hsl(300,70%,50%) 0%, transparent 70%);
+  background: radial-gradient(circle, hsl(315,100%,50%) 0%, transparent 70%);
   top: 40%; left: 55%;
   animation: orb-move-1 28s ease-in-out infinite reverse;
   opacity: 0.2;
@@ -281,14 +281,14 @@ const steps = [
   padding: 6px 16px;
   border-radius: var(--radius-full);
   background: var(--grad-brand-subtle);
-  border: 1px solid hsla(260,80%,62%,0.3);
+  border: 1px solid hsla(330,100%,55%,0.3);
   font-size: 0.8125rem; font-weight: 600;
-  color: hsl(260,80%,80%);
+  color: hsl(330,100%,80%);
   letter-spacing: 0.04em;
 }
 .badge-dot {
   width: 7px; height: 7px; border-radius: 50%;
-  background: hsl(260,80%,62%);
+  background: hsl(330,100%,55%);
   animation: pulse-glow 2s infinite;
 }
 

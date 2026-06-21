@@ -8,8 +8,8 @@
           <polygon points="11,9 21,14 11,19" fill="white"/>
           <defs>
             <linearGradient id="logo-grad" x1="0" y1="0" x2="28" y2="28" gradientUnits="userSpaceOnUse">
-              <stop offset="0%" stop-color="hsl(260,80%,62%)"/>
-              <stop offset="100%" stop-color="hsl(220,85%,60%)"/>
+              <stop offset="0%" stop-color="hsl(330,100%,55%)"/>
+              <stop offset="100%" stop-color="hsl(345,100%,50%)"/>
             </linearGradient>
           </defs>
         </svg>
@@ -86,8 +86,9 @@ const props = defineProps({
 const copied = ref(false)
 
 function copyLink() {
-  const url = window.location.href
-  navigator.clipboard.writeText(url).then(() => {
+  const url = new URL(window.location.href)
+  url.searchParams.delete('host')
+  navigator.clipboard.writeText(url.toString()).then(() => {
     copied.value = true
     setTimeout(() => { copied.value = false }, 2500)
   })
