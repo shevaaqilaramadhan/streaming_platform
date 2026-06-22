@@ -14,6 +14,13 @@ export const MSG_TYPES = {
   SET_VIDEO:    'SET_VIDEO',
   USER_LEFT:    'USER_LEFT',
   SCRAPE_ERROR: 'SCRAPE_ERROR',
+  QUEUE_UPDATE: 'QUEUE_UPDATE',
+  CURRENT_VIDEO_CHANGED: 'CURRENT_VIDEO_CHANGED',
+  ADD_TO_QUEUE: 'ADD_TO_QUEUE',
+  REMOVE_FROM_QUEUE: 'REMOVE_FROM_QUEUE',
+  SKIP_TO_NEXT: 'SKIP_TO_NEXT',
+  CLEAR_QUEUE: 'CLEAR_QUEUE',
+  EPISODE_ENDED: 'EPISODE_ENDED',
 }
 
 export function useRoom(roomId, nickname, isHost) {
@@ -37,6 +44,9 @@ export function useRoom(roomId, nickname, isHost) {
 
   /* ---- Video Metadata ---- */
   const currentMetadata = ref(null)
+
+  /* ---- Play Queue ---- */
+  const queue = ref([])
 
   /* ---- Computed ---- */
   const isConnected = computed(() => status.value === WS_STATUS.CONNECTED)
@@ -69,6 +79,7 @@ export function useRoom(roomId, nickname, isHost) {
           participants.value = data.payload.participants
         }
         currentMetadata.value = data.payload.metadata || null
+        queue.value = data.payload.queue || []
         break
 
       case MSG_TYPES.SYNC_EVENT:
@@ -132,6 +143,18 @@ export function useRoom(roomId, nickname, isHost) {
         setTimeout(() => { scrapeError.value = null }, 8000)
         break
 
+      case MSG_TYPES.QUEUE_UPDATE:
+        queue.value = data.payload.queue || []
+        break
+
+      case MSG_TYPES.CURRENT_VIDEO_CHANGED:
+        playerState.value.videoUrl    = data.payload.videoUrl
+        currentMetadata.value         = data.payload.metadata || null
+        playerState.value.currentTime = 0
+        playerState.value.isPlaying   = false
+        scrapeError.value             = null
+        break
+
       default:
         break
     }
@@ -183,6 +206,44 @@ export function useRoom(roomId, nickname, isHost) {
     disconnect()
   }
 
+  function addToQueue(url) {
+    send({
+      action: MSG_TYPES.ADD_TO_QUEUE,
+      payload: { roomId, url }
+    })
+  }
+
+  function removeFromQueue(itemId) {
+    if (!isHost) return
+    send({
+      action: MSG_TYPES.REMOVE_FROM_QUEUE,
+      payload: { roomId, itemId }
+    })
+  }
+
+  function skipToNext() {
+    if (!isHost) return
+    send({
+      action: MSG_TYPES.SKIP_TO_NEXT,
+      payload: { roomId }
+    })
+  }
+
+  function clearQueue() {
+    if (!isHost) return
+    send({
+      action: MSG_TYPES.CLEAR_QUEUE,
+      payload: { roomId }
+    })
+  }
+
+  function onVideoEnded() {
+    send({
+      action: MSG_TYPES.EPISODE_ENDED,
+      payload: { roomId }
+    })
+  }
+
   return {
     status,
     WS_STATUS,
@@ -192,10 +253,16 @@ export function useRoom(roomId, nickname, isHost) {
     participants,
     scrapeError,
     currentMetadata,
+    queue,
     joinRoom,
     leave,
     sendChatMessage,
     sendSyncEvent,
     setVideo,
+    addToQueue,
+    removeFromQueue,
+    skipToNext,
+    clearQueue,
+    onVideoEnded,
   }
 }

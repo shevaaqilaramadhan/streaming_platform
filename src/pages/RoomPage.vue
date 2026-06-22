@@ -51,17 +51,64 @@
             :player-state="playerState"
             @sync="onSyncEvent"
             @set-video="onSetVideo"
+            @ended="onVideoEnded"
           />
         </section>
 
-        <!-- Chat column -->
-        <aside class="chat-col" aria-label="Chat panel">
-          <ChatPanel
-            :messages="messages"
-            :is-connected="isConnected"
-            :nickname="nickname"
-            @send="onSendChat"
-          />
+        <!-- Sidebar column (Chat & Queue) -->
+        <aside class="sidebar-col" aria-label="Sidebar panel">
+          <!-- Sidebar Tabs -->
+          <div class="sidebar-tabs glass">
+            <button 
+              class="tab-btn" 
+              :class="{ 'tab-btn--active': activeTab === 'chat' }"
+              @click="activeTab = 'chat'"
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+              </svg>
+              Chat
+              <span v-if="messages.length > 0" class="tab-badge">{{ messages.length }}</span>
+            </button>
+            <button 
+              class="tab-btn" 
+              :class="{ 'tab-btn--active': activeTab === 'queue' }"
+              @click="activeTab = 'queue'"
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <line x1="8" y1="6" x2="21" y2="6"/>
+                <line x1="8" y1="12" x2="21" y2="12"/>
+                <line x1="8" y1="18" x2="21" y2="18"/>
+                <line x1="3" y1="6" x2="3.01" y2="6"/>
+                <line x1="3" y1="12" x2="3.01" y2="12"/>
+                <line x1="3" y1="18" x2="3.01" y2="18"/>
+              </svg>
+              Queue
+              <span v-if="queue.length > 0" class="tab-badge tab-badge--primary">{{ queue.length }}</span>
+            </button>
+          </div>
+
+          <!-- Panel Containers -->
+          <div class="panel-container">
+            <Transition name="fade" mode="out-in">
+              <ChatPanel
+                v-if="activeTab === 'chat'"
+                :messages="messages"
+                :is-connected="isConnected"
+                :nickname="nickname"
+                @send="onSendChat"
+              />
+              <QueuePanel
+                v-else
+                :queue="queue"
+                :is-host="isHost"
+                @add="onAddToQueue"
+                @remove="onRemoveFromQueue"
+                @skip="onSkipToNext"
+                @clear="onClearQueue"
+              />
+            </Transition>
+          </div>
         </aside>
       </div>
     </template>
@@ -102,6 +149,7 @@ import { useRoute } from 'vue-router'
 import RoomHeader   from '../components/RoomHeader.vue'
 import VideoPlayer  from '../components/VideoPlayer.vue'
 import ChatPanel    from '../components/ChatPanel.vue'
+import QueuePanel   from '../components/QueuePanel.vue'
 import NicknameModal from '../components/NicknameModal.vue'
 import { useRoom } from '../composables/useRoom.js'
 
@@ -124,6 +172,8 @@ const playerState     = ref({ videoUrl: '', currentTime: 0, isPlaying: false })
 const participants    = ref([])
 const scrapeError     = ref(null)
 const currentMetadata = ref(null)
+const queue           = ref([])
+const activeTab       = ref('chat')
 const isConnected     = computed(() => wsStatus.value === 'connected')
 
 function initRoom() {
@@ -134,6 +184,7 @@ function initRoom() {
   playerState.value     = room.playerState.value
   participants.value    = room.participants.value
   currentMetadata.value = room.currentMetadata.value
+  queue.value           = room.queue.value
 
   // Keep local refs in sync with the composable's reactive state
   watch(room.status,          v => { wsStatus.value    = v })
@@ -142,6 +193,7 @@ function initRoom() {
   watch(room.participants,    v => { participants.value = v }, { deep: true })
   watch(room.scrapeError,     v => { scrapeError.value  = v })
   watch(room.currentMetadata, v => { currentMetadata.value = v }, { deep: true })
+  watch(room.queue,           v => { queue.value = v }, { deep: true })
 
   room.joinRoom()
 }
@@ -171,6 +223,26 @@ function onSetVideo(url) {
 
 function onSendChat(text) {
   room?.sendChatMessage(text)
+}
+
+function onAddToQueue(url) {
+  room?.addToQueue(url)
+}
+
+function onRemoveFromQueue(itemId) {
+  room?.removeFromQueue(itemId)
+}
+
+function onSkipToNext() {
+  room?.skipToNext()
+}
+
+function onClearQueue() {
+  room?.clearQueue()
+}
+
+function onVideoEnded() {
+  room?.onVideoEnded()
 }
 </script>
 
@@ -257,11 +329,72 @@ function onSendChat(text) {
   font-style: italic;
 }
 
-.chat-col {
+.sidebar-col {
   min-height: 0;
   overflow: hidden;
   display: flex;
   flex-direction: column;
+  gap: var(--space-3);
+}
+
+.sidebar-tabs {
+  display: flex;
+  padding: 4px;
+  border-radius: var(--radius-md);
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid var(--color-glass-border);
+  flex-shrink: 0;
+}
+
+.tab-btn {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-sm);
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.tab-btn:hover {
+  color: var(--text-primary);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.tab-btn--active {
+  color: var(--text-primary);
+  background: var(--color-glass-hover);
+  border: 1px solid var(--color-glass-border);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+
+.tab-badge {
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: var(--radius-full);
+  padding: 1px 6px;
+  margin-left: 2px;
+}
+
+.tab-badge--primary {
+  color: white;
+  background: var(--color-primary);
+}
+
+.panel-container {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  position: relative;
 }
 
 /* Disconnected banner */
@@ -342,8 +475,8 @@ function onSendChat(text) {
   .video-col {
     overflow-y: visible;
   }
-  .chat-col {
-    height: 400px;
+  .sidebar-col {
+    height: 480px;
   }
 }
 </style>

@@ -21,7 +21,8 @@ type WatchRoom struct {
 	CurrentVideo    string
 	CurrentTime     float64
 	IsPlaying       bool
-	CurrentMetadata *VideoMetadata
+	CurrentMetadata *QueueItem
+	Queue           []*QueueItem
 	Clients         map[string]*User
 	Mutex           sync.RWMutex
 }
@@ -43,12 +44,13 @@ type Participant struct {
 }
 
 type RoomInitPayload struct {
-	RoomID       string         `json:"roomId"`
-	CurrentVideo string         `json:"currentVideo"`
-	CurrentTime  float64        `json:"currentTime"`
-	IsPlaying    bool           `json:"isPlaying"`
-	Participants []Participant  `json:"participants"`
-	Metadata     *VideoMetadata `json:"metadata,omitempty"`
+	RoomID       string        `json:"roomId"`
+	CurrentVideo string        `json:"currentVideo"`
+	CurrentTime  float64       `json:"currentTime"`
+	IsPlaying    bool          `json:"isPlaying"`
+	Participants []Participant `json:"participants"`
+	Metadata     *QueueItem    `json:"metadata,omitempty"`
+	Queue        []*QueueItem  `json:"queue,omitempty"`
 }
 
 type SyncPayload struct {
@@ -92,4 +94,27 @@ type VideoMetadata struct {
 	Episode      string `json:"episode,omitempty"`
 	ThumbnailURL string `json:"thumbnailUrl,omitempty"`
 	Source       string `json:"source,omitempty"`
+}
+
+type QueueItem struct {
+	ID        string `json:"id"`
+	URL       string `json:"url"`
+	Title     string `json:"title"`
+	Episode   string `json:"episode"`
+	Thumbnail string `json:"thumbnail"`
+}
+
+type AddToQueuePayload struct {
+	RoomID string `json:"roomId"`
+	URL    string `json:"url"`
+}
+
+type RemoveFromQueuePayload struct {
+	RoomID string `json:"roomId"`
+	ItemID string `json:"itemId"`
+}
+
+type QueueUpdatePayload struct {
+	RoomID string       `json:"roomId"`
+	Queue  []*QueueItem `json:"queue"`
 }

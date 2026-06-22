@@ -44,6 +44,7 @@
       @waiting="isLoading = true"
       @playing="isLoading = false"
       @loadedmetadata="onNativeLoadedMetadata"
+      @ended="onNativeEnded"
     ></video>
 
     <!-- Custom controls overlay -->
@@ -60,9 +61,11 @@
         <!-- Big play/pause center button -->
         <Transition name="fade">
           <button
-            v-if="showPlayPulse"
+            v-if="(!isPlaying && videoUrl && !isLoading) || showPlayPulse"
             class="center-play-btn"
             @click="togglePlay"
+            :disabled="!isHost"
+            :data-tooltip="isHost ? null : 'Only the host can control playback'"
             aria-label="Toggle play/pause"
           >
             <svg v-if="!isPlaying" width="36" height="36" viewBox="0 0 24 24" fill="white">
@@ -224,7 +227,7 @@ const props = defineProps({
   playerState: { type: Object,  default: () => ({ isPlaying: false, currentTime: 0 }) },
 })
 
-const emit = defineEmits(['sync', 'set-video'])
+const emit = defineEmits(['sync', 'set-video', 'ended'])
 
 /* ================================================================
    State
@@ -363,6 +366,7 @@ function onYtStateChange(event) {
   } else {
     isPlaying.value = false; stopYtTimePolling()
     if (state === 2 && props.isHost && !ignoreStateChange) emit('sync', { isPlaying: false, currentTime: time })
+    if (state === 0 && props.isHost) emit('ended')
   }
 }
 
@@ -495,6 +499,12 @@ function onNativeLoadedMetadata() {
   if (vid && pendingSeekTime.value !== null) {
     vid.currentTime = pendingSeekTime.value
     pendingSeekTime.value = null
+  }
+}
+
+function onNativeEnded() {
+  if (props.isHost) {
+    emit('ended')
   }
 }
 
@@ -794,6 +804,14 @@ onUnmounted(() => {
   transition: all var(--transition-base);
 }
 .center-play-btn:hover { background: rgba(0,0,0,0.8); transform: translate(-50%,-50%) scale(1.08); }
+.center-play-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.center-play-btn:disabled:hover {
+  background: rgba(0,0,0,0.6);
+  transform: translate(-50%,-50%);
+}
 
 .controls-bar {
   padding: 0 var(--space-4) var(--space-4);

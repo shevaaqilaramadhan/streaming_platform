@@ -42,12 +42,14 @@ func CreateRoomWithID(roomID string) {
 
 func newRoom(roomID string) *models.WatchRoom {
 	return &models.WatchRoom{
-		RoomID:       roomID,
-		HostID:       "",
-		CurrentVideo: "",
-		CurrentTime:  0,
-		IsPlaying:    false,
-		Clients:      make(map[string]*models.User),
+		RoomID:          roomID,
+		HostID:          "",
+		CurrentVideo:    "",
+		CurrentTime:     0,
+		IsPlaying:       false,
+		CurrentMetadata: nil,
+		Queue:           []*models.QueueItem{},
+		Clients:         make(map[string]*models.User),
 	}
 }
 
@@ -132,19 +134,25 @@ func SetRoomMetadata(roomID string, metadata *models.VideoMetadata) {
 
 	room.Mutex.Lock()
 	room.CurrentVideo = metadata.VideoURL
-	room.CurrentMetadata = metadata
+	room.CurrentMetadata = &models.QueueItem{
+		ID:        "",
+		URL:       metadata.VideoURL,
+		Title:     metadata.Title,
+		Episode:   metadata.Episode,
+		Thumbnail: metadata.ThumbnailURL,
+	}
 	room.CurrentTime = 0
 	room.IsPlaying = false
 	room.Mutex.Unlock()
 }
 
-func GetRoomState(roomID string) (string, float64, bool, []models.Participant, *models.VideoMetadata) {
+func GetRoomState(roomID string) (string, float64, bool, []models.Participant, *models.QueueItem, []*models.QueueItem) {
 	mu.RLock()
 	defer mu.RUnlock()
 
 	room, exists := rooms[roomID]
 	if !exists {
-		return "", 0, false, nil, nil
+		return "", 0, false, nil, nil, nil
 	}
 
 	room.Mutex.RLock()
@@ -158,5 +166,5 @@ func GetRoomState(roomID string) (string, float64, bool, []models.Participant, *
 		})
 	}
 
-	return room.CurrentVideo, room.CurrentTime, room.IsPlaying, participants, room.CurrentMetadata
+	return room.CurrentVideo, room.CurrentTime, room.IsPlaying, participants, room.CurrentMetadata, room.Queue
 }

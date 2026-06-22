@@ -42,6 +42,16 @@ func HandleMessage(user *models.User, room *models.WatchRoom, msgBytes []byte) {
 		handleChatEvent(user, room, msg.Payload)
 	case "SET_VIDEO":
 		handleSetVideo(user, room, msg.Payload)
+	case "ADD_TO_QUEUE":
+		handleAddToQueue(user, room, msg.Payload)
+	case "REMOVE_FROM_QUEUE":
+		handleRemoveFromQueue(user, room, msg.Payload)
+	case "SKIP_TO_NEXT":
+		handleSkipToNext(user, room, msg.Payload)
+	case "CLEAR_QUEUE":
+		handleClearQueue(user, room, msg.Payload)
+	case "EPISODE_ENDED":
+		handleEpisodeEnded(user, room, msg.Payload)
 	default:
 		log.Println("Unknown action:", msg.Action)
 	}
@@ -65,7 +75,7 @@ func handleJoinEvent(user *models.User, room *models.WatchRoom, payloadRaw json.
 	}
 	room.Mutex.Unlock()
 
-	currentVideo, currentTime, isPlaying, participants, metadata := GetRoomState(room.RoomID)
+	currentVideo, currentTime, isPlaying, participants, metadata, queue := GetRoomState(room.RoomID)
 
 	roomInitMsg := models.Message{
 		Action: "ROOM_INIT",
@@ -76,6 +86,7 @@ func handleJoinEvent(user *models.User, room *models.WatchRoom, payloadRaw json.
 			IsPlaying:    isPlaying,
 			Participants: participants,
 			Metadata:     metadata,
+			Queue:        queue,
 		})),
 	}
 
@@ -170,6 +181,166 @@ func handleSetVideo(user *models.User, room *models.WatchRoom, payloadRaw json.R
 		Payload: mustMarshalRaw(broadcastPayload),
 	}
 	BroadcastToRoom(room, mustMarshal(msg), nil)
+}
+
+func handleAddToQueue(user *models.User, room *models.WatchRoom, payloadRaw json.RawMessage) {
+	var payload models.AddToQueuePayload
+	if err := json.Unmarshal(payloadRaw, &payload); err != nil {
+		log.Println("Invalid ADD_TO_QUEUE payload:", err)
+		return
+	}
+
+	queueItem, err := AddToQueue(room.RoomID, payload.URL)
+	if err != nil {
+		log.Printf("Failed to add to queue: %v", err)
+		errMsg := models.Message{
+			Action: "SCRAPE_ERROR",
+			Payload: mustMarshalRaw(models.ScrapeErrorPayload{
+				OriginalURL: payload.URL,
+				Error:       err.Error(),
+			}),
+		}
+		SendToUser(user, mustMarshal(errMsg))
+		return
+	}
+
+	queue := GetQueue(room.RoomID)
+	broadcastMsg := models.Message{
+		Action: "QUEUE_UPDATE",
+		Payload: mustMarshalRaw(models.QueueUpdatePayload{
+			RoomID: room.RoomID,
+			Queue:  queue,
+		}),
+	}
+	BroadcastToRoom(room, mustMarshal(broadcastMsg), nil)
+
+	log.Printf("User %s added to queue: %s", user.Username, queueItem.Title)
+}
+
+func handleRemoveFromQueue(user *models.User, room *models.WatchRoom, payloadRaw json.RawMessage) {
+	if !user.IsHost {
+		log.Printf("Non-host %s tried to remove from queue", user.Username)
+		return
+	}
+
+	var payload models.RemoveFromQueuePayload
+	if err := json.Unmarshal(payloadRaw, &payload); err != nil {
+		log.Println("Invalid REMOVE_FROM_QUEUE payload:", err)
+		return
+	}
+
+	if err := RemoveFromQueue(room.RoomID, payload.ItemID); err != nil {
+		log.Printf("Failed to remove from queue: %v", err)
+		return
+	}
+
+	queue := GetQueue(room.RoomID)
+	broadcastMsg := models.Message{
+		Action: "QUEUE_UPDATE",
+		Payload: mustMarshalRaw(models.QueueUpdatePayload{
+			RoomID: room.RoomID,
+			Queue:  queue,
+		}),
+	}
+	BroadcastToRoom(room, mustMarshal(broadcastMsg), nil)
+}
+
+func handleSkipToNext(user *models.User, room *models.WatchRoom, payloadRaw json.RawMessage) {
+	if !user.IsHost {
+		log.Printf("Non-host %s tried to skip to next", user.Username)
+		return
+	}
+
+	nextItem, err := SkipToNext(room.RoomID)
+	if err != nil {
+		log.Printf("Failed to skip to next: %v", err)
+		return
+	}
+
+	room.Mutex.Lock()
+	room.CurrentVideo = nextItem.URL
+	room.CurrentMetadata = nextItem
+	room.CurrentTime = 0
+	room.IsPlaying = false
+	room.Mutex.Unlock()
+
+	videoChangedMsg := models.Message{
+		Action: "CURRENT_VIDEO_CHANGED",
+		Payload: mustMarshalRaw(map[string]interface{}{
+			"roomId":   room.RoomID,
+			"videoUrl": nextItem.URL,
+			"metadata": nextItem,
+		}),
+	}
+	BroadcastToRoom(room, mustMarshal(videoChangedMsg), nil)
+
+	queue := GetQueue(room.RoomID)
+	queueMsg := models.Message{
+		Action: "QUEUE_UPDATE",
+		Payload: mustMarshalRaw(models.QueueUpdatePayload{
+			RoomID: room.RoomID,
+			Queue:  queue,
+		}),
+	}
+	BroadcastToRoom(room, mustMarshal(queueMsg), nil)
+}
+
+func handleClearQueue(user *models.User, room *models.WatchRoom, payloadRaw json.RawMessage) {
+	if !user.IsHost {
+		log.Printf("Non-host %s tried to clear queue", user.Username)
+		return
+	}
+
+	if err := ClearQueue(room.RoomID); err != nil {
+		log.Printf("Failed to clear queue: %v", err)
+		return
+	}
+
+	broadcastMsg := models.Message{
+		Action: "QUEUE_UPDATE",
+		Payload: mustMarshalRaw(models.QueueUpdatePayload{
+			RoomID: room.RoomID,
+			Queue:  []*models.QueueItem{},
+		}),
+	}
+	BroadcastToRoom(room, mustMarshal(broadcastMsg), nil)
+}
+
+func handleEpisodeEnded(user *models.User, room *models.WatchRoom, payloadRaw json.RawMessage) {
+	nextItem, err := SkipToNext(room.RoomID)
+	if err != nil {
+		log.Printf("Auto-advance failed (queue empty): %v", err)
+		return
+	}
+
+	room.Mutex.Lock()
+	room.CurrentVideo = nextItem.URL
+	room.CurrentMetadata = nextItem
+	room.CurrentTime = 0
+	room.IsPlaying = false
+	room.Mutex.Unlock()
+
+	videoChangedMsg := models.Message{
+		Action: "CURRENT_VIDEO_CHANGED",
+		Payload: mustMarshalRaw(map[string]interface{}{
+			"roomId":   room.RoomID,
+			"videoUrl": nextItem.URL,
+			"metadata": nextItem,
+		}),
+	}
+	BroadcastToRoom(room, mustMarshal(videoChangedMsg), nil)
+
+	queue := GetQueue(room.RoomID)
+	queueMsg := models.Message{
+		Action: "QUEUE_UPDATE",
+		Payload: mustMarshalRaw(models.QueueUpdatePayload{
+			RoomID: room.RoomID,
+			Queue:  queue,
+		}),
+	}
+	BroadcastToRoom(room, mustMarshal(queueMsg), nil)
+
+	log.Printf("Auto-advanced to: %s - %s", nextItem.Title, nextItem.Episode)
 }
 
 func extractDomainFromURL(rawURL string) string {
