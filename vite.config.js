@@ -12,15 +12,13 @@ export default defineConfig({
         target: 'http://localhost:8080',
         changeOrigin: true,
       },
-      // Proxy WebSocket connections to the Go backend
+      // Proxy WebSocket connections to the Go backend.
+      // Use http:// target (Vite upgrades to WS). Do NOT rewrite Origin — backend
+      // CORS allows localhost/127.0.0.1 any port when CORS_ORIGINS is unset.
       '/ws': {
-        target: 'ws://localhost:8080',
+        target: 'http://localhost:8080',
         ws: true,
         changeOrigin: true,
-        // Rewrites the Origin header to match the target host (localhost:8080)
-        // so Go's websocket.Upgrader default CheckOrigin accepts the connection.
-        // Without this, the proxy forwards Origin: localhost:5174 → Go rejects it → EPIPE
-        rewriteWsOrigin: true,
       },
     },
   },

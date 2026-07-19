@@ -22,20 +22,7 @@
         </svg>
         <span class="nav-brand">WatchParty</span>
       </router-link>
-      
-      <button
-        class="hamburger-btn"
-        aria-label="Toggle navigation menu"
-        :aria-expanded="mobileMenuOpen"
-        @click="mobileMenuOpen = !mobileMenuOpen"
-      >
-        <svg v-if="!mobileMenuOpen" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
-          <line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/>
-        </svg>
-        <svg v-else width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
-          <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
-        </svg>
-      </button>
+
       <nav class="nav-links" :class="{ 'nav-links--open': mobileMenuOpen }" aria-label="Main">
         <router-link to="/docs" class="nav-link" @click="mobileMenuOpen = false">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -64,7 +51,35 @@
           GitHub
         </a>
       </nav>
+
+      <div class="nav-right-controls">
+        <ThemeToggle />
+        <button
+          class="hamburger-btn"
+          aria-label="Toggle navigation menu"
+          :aria-expanded="mobileMenuOpen"
+          @click="mobileMenuOpen = !mobileMenuOpen"
+        >
+          <svg v-if="!mobileMenuOpen" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+            <line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/>
+          </svg>
+          <svg v-else width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+            <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+          </svg>
+        </button>
+      </div>
     </nav>
+
+    <!-- Flash banner (e.g. kicked from room) -->
+    <Transition name="slide-down">
+      <div v-if="flashMsg" class="flash-banner glass" role="alert">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/>
+        </svg>
+        <span>{{ flashMsg }}</span>
+        <button class="flash-dismiss" type="button" aria-label="Dismiss" @click="flashMsg = ''">&times;</button>
+      </div>
+    </Transition>
 
     <!-- Hero Section -->
     <section class="hero-section" aria-labelledby="hero-heading">
@@ -367,14 +382,40 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { ref, onMounted } from 'vue'
+import { useRouter, useRoute } from 'vue-router'
+import ThemeToggle from '../components/ThemeToggle.vue'
 
 const router = useRouter()
+const route = useRoute()
 const isCreating = ref(false)
 const joinRoomId = ref('')
 const errorMsg   = ref('')
+const flashMsg   = ref('')
 const mobileMenuOpen = ref(false)
+
+onMounted(() => {
+  // Prefer sessionStorage flash (set on kick); fall back to ?kicked=1
+  try {
+    const raw = sessionStorage.getItem('wp_flash')
+    if (raw) {
+      sessionStorage.removeItem('wp_flash')
+      const data = JSON.parse(raw)
+      if (data?.message) {
+        flashMsg.value = data.message
+      }
+    }
+  } catch { /* ignore */ }
+  if (!flashMsg.value && (route.query.kicked === '1' || route.query.kicked === 'true')) {
+    flashMsg.value = 'You have been removed from the room by the host.'
+  }
+  if (flashMsg.value && route.query.kicked) {
+    router.replace({ name: 'home', query: {} })
+  }
+  if (flashMsg.value) {
+    setTimeout(() => { flashMsg.value = '' }, 8000)
+  }
+})
 
 /* ---- Create Room ----
  * Calls the Go backend to generate a unique room ID.
@@ -457,6 +498,49 @@ const features = [
   overflow-x: hidden;
 }
 
+.flash-banner {
+  position: sticky;
+  top: 56px;
+  z-index: var(--z-toast);
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin: var(--space-3) var(--space-6) 0;
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-md);
+  color: var(--text-primary);
+  border-color: hsla(0, 75%, 55%, 0.35) !important;
+  background: color-mix(in srgb, var(--color-bg-surface) 92%, transparent) !important;
+  box-shadow: var(--shadow-card);
+  font-size: 0.9rem;
+  font-weight: 500;
+}
+.flash-banner svg {
+  color: var(--color-accent-red);
+  flex-shrink: 0;
+}
+.flash-dismiss {
+  margin-left: auto;
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 1.25rem;
+  cursor: pointer;
+  line-height: 1;
+  padding: 0 4px;
+}
+.flash-dismiss:hover { color: var(--text-primary); }
+
+.slide-down-enter-active,
+.slide-down-leave-active {
+  transition: all 0.25s ease;
+}
+.slide-down-enter-from,
+.slide-down-leave-to {
+  opacity: 0;
+  transform: translateY(-12px);
+}
+
 /* Orbs */
 .orbs { position: fixed; inset: 0; pointer-events: none; z-index: 0; overflow: hidden; }
 .orb {
@@ -491,7 +575,7 @@ const features = [
   padding: 0 var(--space-8);
   height: 56px;
   position: sticky; top: 0; z-index: var(--z-overlay);
-  background: rgba(10, 11, 16, 0.8);
+  background: color-mix(in srgb, var(--color-bg-base) 82%, transparent);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
   border-bottom: 1px solid var(--color-glass-border);
@@ -510,6 +594,7 @@ const features = [
   display: flex;
   align-items: center;
   gap: var(--space-1);
+  margin-left: auto;
 }
 
 .hamburger-btn {
@@ -527,7 +612,7 @@ const features = [
 }
 .hamburger-btn:hover {
   color: var(--text-primary);
-  background: rgba(255, 255, 255, 0.05);
+  background: var(--color-glass-hover);
 }
 
 .nav-link {
@@ -542,7 +627,7 @@ const features = [
 }
 .nav-link:hover {
   color: var(--text-primary);
-  background: rgba(255, 255, 255, 0.05);
+  background: var(--color-glass-hover);
 }
 .nav-link svg { opacity: 0.7; }
 .nav-link:hover svg { opacity: 1; }
@@ -551,6 +636,12 @@ const features = [
   display: flex;
   align-items: center;
   gap: var(--space-6);
+}
+
+.nav-right-controls {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
 }
 
 .nav-profile-btn {
@@ -1462,7 +1553,7 @@ const features = [
     flex-direction: column;
     align-items: stretch;
     gap: 0;
-    background: rgba(10, 11, 16, 0.95);
+    background: color-mix(in srgb, var(--color-bg-base) 95%, transparent);
     backdrop-filter: blur(20px);
     -webkit-backdrop-filter: blur(20px);
     border-bottom: 1px solid var(--color-glass-border);

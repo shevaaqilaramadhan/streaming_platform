@@ -19,8 +19,41 @@
       <div class="divider"></div>
 
       <div class="room-info">
-        <span class="room-label">Room</span>
-        <span class="room-id">{{ roomId }}</span>
+        <!-- Room name display / inline edit -->
+        <div v-if="isEditingName" class="room-name-edit">
+          <input
+            ref="nameInputRef"
+            v-model="editingName"
+            class="room-name-input"
+            type="text"
+            maxlength="40"
+            placeholder="Room name"
+            @keydown.enter="saveName"
+            @keydown.esc="cancelEditName"
+            @blur="saveName"
+          />
+        </div>
+        <template v-else>
+          <span v-if="displayName" class="room-name" @click="startEditName" :data-tooltip="isHost ? 'Click to edit' : ''">
+            {{ displayName }}
+          </span>
+          <span class="room-label">Room</span>
+          <span class="room-id">{{ roomId }}</span>
+        </template>
+
+        <button
+          v-if="isHost && !isEditingName"
+          class="btn btn-ghost btn-sm edit-name-btn"
+          @click="startEditName"
+          data-tooltip="Edit room name"
+          aria-label="Edit room name"
+        >
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+          </svg>
+        </button>
+
         <button
           id="copy-room-link-btn"
           class="btn btn-ghost btn-sm copy-btn"
@@ -83,8 +116,13 @@
 
     <!-- Right: User info + status -->
     <div class="room-header__right">
-      <!-- Participant count -->
-      <div class="participant-count" data-tooltip="Viewers in room">
+      <!-- Participant count (clickable) -->
+      <button
+        class="participant-count-btn"
+        data-tooltip="View participants"
+        aria-label="View participants"
+        @click="$emit('toggle-user-list')"
+      >
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
           <circle cx="9" cy="7" r="4"/>
@@ -92,7 +130,7 @@
           <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
         </svg>
         <span>{{ participantCount }}</span>
-      </div>
+      </button>
 
       <!-- User badge -->
       <span class="badge" :class="isHost ? 'badge-host' : 'badge-guest'">
@@ -107,13 +145,15 @@
       </span>
 
       <ConnectionStatus :status="wsStatus" />
+      <ThemeToggle />
     </div>
   </header>
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, nextTick, computed } from 'vue'
 import ConnectionStatus from './ConnectionStatus.vue'
+import ThemeToggle from './ThemeToggle.vue'
 
 const props = defineProps({
   roomId:           { type: String, required: true },
@@ -122,11 +162,17 @@ const props = defineProps({
   wsStatus:         { type: String, required: true },
   participantCount: { type: Number, default: 1 },
   isPublic:         { type: Boolean, default: false },
+  roomName:         { type: String, default: '' },
 })
 
-defineEmits(['toggle-public'])
+const emit = defineEmits(['toggle-public', 'toggle-user-list', 'set-room-name'])
 
 const copied = ref(false)
+const isEditingName = ref(false)
+const editingName = ref('')
+const nameInputRef = ref(null)
+
+const displayName = computed(() => props.roomName || '')
 
 function copyLink() {
   const url = new URL(window.location.href)
@@ -137,6 +183,29 @@ function copyLink() {
   }).catch((err) => {
     console.warn('[RoomHeader] Clipboard write failed:', err)
   })
+}
+
+function startEditName() {
+  if (!props.isHost) return
+  editingName.value = props.roomName || ''
+  isEditingName.value = true
+  nextTick(() => {
+    nameInputRef.value?.focus()
+    nameInputRef.value?.select()
+  })
+}
+
+function saveName() {
+  if (!isEditingName.value) return
+  const name = editingName.value.trim()
+  isEditingName.value = false
+  if (name !== (props.roomName || '')) {
+    emit('set-room-name', name)
+  }
+}
+
+function cancelEditName() {
+  isEditingName.value = false
 }
 </script>
 
@@ -243,10 +312,113 @@ function copyLink() {
   font-weight: 600;
 }
 
+.participant-count-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--text-secondary);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--color-glass-border);
+  border-radius: var(--radius-full);
+  padding: 4px 10px;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  font-family: var(--font-sans);
+}
+.participant-count-btn:hover {
+  color: var(--text-primary);
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.12);
+}
+
+/* Room name */
+.room-name {
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: var(--color-primary);
+  cursor: default;
+  max-width: 12rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.is-host .room-name,
+.room-name[data-tooltip] {
+  cursor: pointer;
+}
+
+.edit-name-btn {
+  padding: 4px;
+  width: 28px;
+  height: 28px;
+}
+
+.room-name-edit {
+  display: flex;
+  align-items: center;
+}
+
+.room-name-input {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--color-primary);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  font-size: 0.85rem;
+  font-weight: 600;
+  padding: 3px 8px;
+  width: 160px;
+  outline: none;
+  box-shadow: 0 0 0 3px hsla(195, 100%, 45%, 0.15);
+}
+
 @media (max-width: 600px) {
   .logo-name { display: none; }
   .divider { display: none; }
   .room-label { display: none; }
   .room-header { padding: var(--space-3) var(--space-4); }
+}
+
+@media (max-width: 414px) {
+  .room-header {
+    gap: var(--space-2);
+    padding: var(--space-2) var(--space-3);
+    flex-wrap: wrap;
+  }
+  .room-header__left {
+    flex: 1 1 auto;
+    min-width: 0;
+    gap: var(--space-2);
+    overflow: hidden;
+  }
+  .room-header__right {
+    flex-shrink: 0;
+    gap: var(--space-2);
+  }
+  .room-info {
+    min-width: 0;
+    flex-wrap: wrap;
+  }
+  .room-id {
+    font-size: 0.75rem;
+    padding: 2px 6px;
+    max-width: 8rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .room-name {
+    max-width: 6rem;
+    font-size: 0.8rem;
+  }
+  .room-name-input {
+    width: 120px;
+  }
+  .copy-btn span { display: none; }
+  .visibility-btn span { display: none; }
+  .room-visibility-badge span { display: none; }
+  .badge { font-size: 0.6875rem; padding: 2px 6px; }
+  .badge { max-width: 5.5rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 }
 </style>

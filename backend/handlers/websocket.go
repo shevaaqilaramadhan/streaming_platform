@@ -37,7 +37,31 @@ var upgrader = websocket.Upgrader{
 }
 
 func checkOrigin(r *http.Request) bool {
-	return utils.IsOriginAllowed(r.Header.Get("Origin"))
+	origin := r.Header.Get("Origin")
+	if utils.IsOriginAllowed(origin) {
+		return true
+	}
+	// Vite may rewrite WS Origin to the backend host (e.g. http://localhost:8080).
+	if origin != "" && r.Host != "" {
+		if host := originHost(origin); host != "" && strings.EqualFold(host, r.Host) {
+			return true
+		}
+	}
+	log.Printf("WebSocket origin rejected: %q (Host=%q)", origin, r.Host)
+	return false
+}
+
+func originHost(origin string) string {
+	if i := strings.Index(origin, "://"); i >= 0 {
+		origin = origin[i+3:]
+	}
+	if origin == "" {
+		return ""
+	}
+	if i := strings.IndexAny(origin, "/?"); i >= 0 {
+		origin = origin[:i]
+	}
+	return origin
 }
 
 func HandleWebSocket(w http.ResponseWriter, r *http.Request) {

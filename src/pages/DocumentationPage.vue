@@ -15,19 +15,6 @@
         </svg>
         <span class="nav-brand">WatchParty</span>
       </router-link>
-      <button
-        class="hamburger-btn"
-        aria-label="Toggle navigation menu"
-        :aria-expanded="mobileMenuOpen"
-        @click="mobileMenuOpen = !mobileMenuOpen"
-      >
-        <svg v-if="!mobileMenuOpen" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
-          <line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/>
-        </svg>
-        <svg v-else width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
-          <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
-        </svg>
-      </button>
       <nav class="nav-links" :class="{ 'nav-links--open': mobileMenuOpen }" aria-label="Main">
         <router-link to="/docs" class="nav-link active" @click="mobileMenuOpen = false">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -56,6 +43,22 @@
           GitHub
         </a>
       </nav>
+      <div class="nav-right-controls">
+        <ThemeToggle />
+        <button
+          class="hamburger-btn"
+          aria-label="Toggle navigation menu"
+          :aria-expanded="mobileMenuOpen"
+          @click="mobileMenuOpen = !mobileMenuOpen"
+        >
+          <svg v-if="!mobileMenuOpen" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+            <line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/>
+          </svg>
+          <svg v-else width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+            <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+          </svg>
+        </button>
+      </div>
     </nav>
 
     <!-- Content Layout -->
@@ -445,6 +448,42 @@
                   <code class="event-name">HOST_CHANGED</code>
                   <span class="event-desc">Notify when the host role is reassigned</span>
                 </div>
+                <div class="api-event">
+                  <code class="event-name">TRANSFER_HOST</code>
+                  <span class="event-desc">Host promotes another participant (host only)</span>
+                </div>
+                <div class="api-event">
+                  <code class="event-name">KICK_USER</code>
+                  <span class="event-desc">Host removes a participant (host only)</span>
+                </div>
+                <div class="api-event">
+                  <code class="event-name">KICKED</code>
+                  <span class="event-desc">Sent to the kicked client before disconnect</span>
+                </div>
+                <div class="api-event">
+                  <code class="event-name">SET_ROOM_NAME</code>
+                  <span class="event-desc">Host renames the room (host only)</span>
+                </div>
+                <div class="api-event">
+                  <code class="event-name">ROOM_NAME_CHANGED</code>
+                  <span class="event-desc">Broadcast when room name is updated</span>
+                </div>
+                <div class="api-event">
+                  <code class="event-name">SCRAPE_STARTED</code>
+                  <span class="event-desc">Stream extraction began (e.g. IDLIX may take 30–90s)</span>
+                </div>
+                <div class="api-event">
+                  <code class="event-name">SCRAPE_FINISHED</code>
+                  <span class="event-desc">Stream extraction finished (success path)</span>
+                </div>
+                <div class="api-event">
+                  <code class="event-name">REACTION</code>
+                  <span class="event-desc">Floating emoji reaction in the room</span>
+                </div>
+                <div class="api-event">
+                  <code class="event-name">TYPING</code>
+                  <span class="event-desc">Chat typing indicator (not echoed to sender)</span>
+                </div>
               </div>
             </div>
           </div>
@@ -472,6 +511,7 @@
 
 <script setup>
 import { ref, onMounted, onUnmounted } from 'vue'
+import ThemeToggle from '../components/ThemeToggle.vue'
 
 const activeSection = ref('quick-start')
 const mobileMenuOpen = ref(false)
@@ -557,7 +597,7 @@ onUnmounted(() => window.removeEventListener('scroll', handleScroll))
   padding: 0 var(--space-8);
   height: 56px;
   position: sticky; top: 0; z-index: var(--z-overlay);
-  background: rgba(10, 11, 16, 0.8);
+  background: color-mix(in srgb, var(--color-bg-base) 82%, transparent);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
   border-bottom: 1px solid var(--color-glass-border);
@@ -570,7 +610,12 @@ onUnmounted(() => window.removeEventListener('scroll', handleScroll))
   font-size: 1.05rem; font-weight: 700; letter-spacing: -0.02em;
   color: var(--text-primary);
 }
-.nav-links { display: flex; align-items: center; gap: var(--space-1); }
+.nav-links { display: flex; align-items: center; gap: var(--space-1); margin-left: auto; }
+.nav-right-controls {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
 .hamburger-btn {
   display: none;
   align-items: center;
@@ -586,7 +631,7 @@ onUnmounted(() => window.removeEventListener('scroll', handleScroll))
 }
 .hamburger-btn:hover {
   color: var(--text-primary);
-  background: rgba(255, 255, 255, 0.05);
+  background: var(--color-glass-hover);
 }
 .nav-link {
   display: inline-flex; align-items: center; gap: 5px;
@@ -597,11 +642,11 @@ onUnmounted(() => window.removeEventListener('scroll', handleScroll))
 }
 .nav-link:hover {
   color: var(--text-primary);
-  background: rgba(255, 255, 255, 0.05);
+  background: var(--color-glass-hover);
 }
 .nav-link.active {
   color: var(--text-primary);
-  background: rgba(255, 255, 255, 0.08);
+  background: var(--color-glass-hover);
 }
 .nav-link svg { opacity: 0.7; }
 .nav-link:hover svg, .nav-link.active svg { opacity: 1; }
@@ -641,7 +686,7 @@ onUnmounted(() => window.removeEventListener('scroll', handleScroll))
 .docs-sidebar {
   position: relative;
   border-right: 1px solid var(--color-glass-border);
-  background: rgba(10, 11, 16, 0.4);
+  background: color-mix(in srgb, var(--color-bg-surface) 55%, transparent);
 }
 .sidebar-sticky {
   position: sticky; top: 56px;
@@ -672,7 +717,7 @@ onUnmounted(() => window.removeEventListener('scroll', handleScroll))
   color: var(--text-secondary); text-decoration: none;
   transition: all var(--transition-fast);
 }
-.sidebar-link:hover { color: var(--text-primary); background: rgba(255, 255, 255, 0.04); }
+.sidebar-link:hover { color: var(--text-primary); background: var(--color-glass-hover); }
 .sidebar-link.active {
   color: var(--color-primary);
   background: var(--grad-brand-subtle);
@@ -737,7 +782,7 @@ onUnmounted(() => window.removeEventListener('scroll', handleScroll))
 .step-card h3 { font-size: 1rem; font-weight: 700; margin: 0; }
 .step-card p { font-size: 0.9rem; color: var(--text-secondary); line-height: 1.6; margin: 0; }
 .step-code {
-  background: rgba(0, 0, 0, 0.3);
+  background: color-mix(in srgb, var(--color-bg-elevated) 90%, transparent);
   border: 1px solid var(--color-glass-border);
   border-radius: var(--radius-sm);
   padding: 6px 10px;
@@ -751,7 +796,7 @@ onUnmounted(() => window.removeEventListener('scroll', handleScroll))
   display: flex; align-items: flex-start; gap: 6px;
   font-size: 0.8rem; color: var(--text-muted);
   padding: 6px 8px; border-radius: var(--radius-sm);
-  background: rgba(255, 255, 255, 0.03);
+  background: var(--color-glass);
   border: 1px solid var(--color-glass-border);
 }
 .step-tip svg { flex-shrink: 0; margin-top: 1px; color: var(--color-primary); }
@@ -759,7 +804,7 @@ onUnmounted(() => window.removeEventListener('scroll', handleScroll))
 .format-badge {
   padding: 3px 10px; border-radius: var(--radius-full);
   font-size: 0.75rem; font-weight: 600;
-  background: rgba(255, 255, 255, 0.06);
+  background: var(--color-glass-hover);
   border: 1px solid var(--color-glass-border);
   color: var(--text-secondary);
 }
@@ -776,14 +821,14 @@ onUnmounted(() => window.removeEventListener('scroll', handleScroll))
   align-items: center;
 }
 .table-header {
-  background: rgba(255, 255, 255, 0.04);
+  background: var(--color-glass);
   font-size: 0.75rem; font-weight: 700;
   text-transform: uppercase; letter-spacing: 0.06em;
   color: var(--text-muted);
   border-bottom: 1px solid var(--color-glass-border);
 }
 .table-row {
-  border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+  border-bottom: 1px solid var(--color-glass-border);
   font-size: 0.9rem;
 }
 .table-row:last-child { border-bottom: none; }
@@ -821,7 +866,7 @@ onUnmounted(() => window.removeEventListener('scroll', handleScroll))
 .source-card h3 { font-size: 1rem; font-weight: 700; margin: 0; }
 .source-card p { font-size: 0.9rem; color: var(--text-secondary); line-height: 1.6; margin: 0; }
 .source-example {
-  background: rgba(0, 0, 0, 0.3);
+  background: color-mix(in srgb, var(--color-bg-elevated) 90%, transparent);
   border: 1px solid var(--color-glass-border);
   border-radius: var(--radius-sm);
   padding: 6px 10px;
@@ -850,14 +895,14 @@ onUnmounted(() => window.removeEventListener('scroll', handleScroll))
   align-items: center;
 }
 .sites-table-header {
-  background: rgba(255, 255, 255, 0.04);
+  background: var(--color-glass);
   font-size: 0.75rem; font-weight: 700;
   text-transform: uppercase; letter-spacing: 0.06em;
   color: var(--text-muted);
   border-bottom: 1px solid var(--color-glass-border);
 }
 .sites-table-row {
-  border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+  border-bottom: 1px solid var(--color-glass-border);
   font-size: 0.9rem;
 }
 .sites-table-row:last-child { border-bottom: none; }
@@ -927,7 +972,7 @@ onUnmounted(() => window.removeEventListener('scroll', handleScroll))
   font-size: 0.875rem;
   transition: background var(--transition-fast);
 }
-.queue-item:hover { background: rgba(255, 255, 255, 0.03); }
+.queue-item:hover { background: var(--color-glass-hover); }
 .queue-item.now-playing {
   background: var(--grad-brand-subtle);
   border-left: 2px solid var(--color-primary);
@@ -938,7 +983,7 @@ onUnmounted(() => window.removeEventListener('scroll', handleScroll))
 }
 .queue-pos {
   width: 20px; height: 20px; border-radius: 50%;
-  background: rgba(255, 255, 255, 0.06);
+  background: var(--color-glass-hover);
   font-size: 0.7rem; font-weight: 700;
   display: flex; align-items: center; justify-content: center;
   color: var(--text-muted);
@@ -969,12 +1014,12 @@ onUnmounted(() => window.removeEventListener('scroll', handleScroll))
 .shortcut-key {
   display: inline-flex; align-items: center; justify-content: center;
   min-width: 48px; height: 32px; padding: 0 10px;
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: var(--color-bg-elevated);
+  border: 1px solid var(--color-glass-border);
   border-radius: var(--radius-sm);
   font-family: var(--font-mono); font-size: 0.8rem;
   font-weight: 600; color: var(--text-primary);
-  box-shadow: 0 2px 0 rgba(0, 0, 0, 0.3);
+  box-shadow: 0 2px 0 color-mix(in srgb, var(--text-primary) 12%, transparent);
 }
 .shortcut-desc { font-size: 0.9rem; color: var(--text-secondary); }
 
@@ -983,7 +1028,7 @@ onUnmounted(() => window.removeEventListener('scroll', handleScroll))
 .api-header {
   display: flex; align-items: center; gap: var(--space-3);
   padding: var(--space-4) var(--space-5);
-  background: rgba(255, 255, 255, 0.03);
+  background: var(--color-glass);
   border-bottom: 1px solid var(--color-glass-border);
 }
 .api-method {
@@ -1012,7 +1057,7 @@ onUnmounted(() => window.removeEventListener('scroll', handleScroll))
 .api-event {
   display: flex; align-items: center; gap: var(--space-3);
   padding: 6px 0;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+  border-bottom: 1px solid var(--color-glass-border);
 }
 .api-event:last-child { border-bottom: none; }
 .event-name {
@@ -1053,7 +1098,7 @@ onUnmounted(() => window.removeEventListener('scroll', handleScroll))
     flex-direction: column;
     align-items: stretch;
     gap: 0;
-    background: rgba(10, 11, 16, 0.95);
+    background: color-mix(in srgb, var(--color-bg-base) 95%, transparent);
     backdrop-filter: blur(20px);
     -webkit-backdrop-filter: blur(20px);
     border-bottom: 1px solid var(--color-glass-border);

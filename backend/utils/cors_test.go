@@ -29,6 +29,7 @@ func TestIsOriginAllowed_DevLocalhost(t *testing.T) {
 		"http://localhost:5173",
 		"http://localhost:3000",
 		"http://127.0.0.1:8080",
+		"http://localhost:8080", // Vite proxy rewriteWsOrigin target
 	}
 	for _, o := range cases {
 		if !IsOriginAllowed(o) {

@@ -27,6 +27,21 @@ const WS_STATUS = {
   RECONNECTING: 'reconnecting',
 }
 
+/** Rooms this browser was kicked from — survives reconnect races across WS instances */
+const kickedRoomIds = new Set()
+
+export function markRoomKicked(id) {
+  if (id) kickedRoomIds.add(String(id))
+}
+
+export function isRoomKicked(id) {
+  return id ? kickedRoomIds.has(String(id)) : false
+}
+
+export function clearRoomKicked(id) {
+  if (id) kickedRoomIds.delete(String(id))
+}
+
 export function useWebSocket(roomId) {
   const status = ref(WS_STATUS.DISCONNECTED)
   const ws = ref(null)
@@ -35,9 +50,28 @@ export function useWebSocket(roomId) {
   let reconnectAttempts = 0
   const MAX_RECONNECT_ATTEMPTS = 5
   let intentionalClose = false
+  // Permanent: kick / ban — never auto-reconnect this socket instance
+  let permanentClose = false
+  const roomKey = String(roomId || '')
+
+  function clearReconnect() {
+    clearTimeout(reconnectTimer)
+    reconnectTimer = null
+  }
+
+  function shouldStayDead() {
+    return permanentClose || intentionalClose || isRoomKicked(roomKey)
+  }
 
   function connect() {
-    if (ws.value && ws.value.readyState === WebSocket.OPEN) return
+    if (shouldStayDead()) {
+      status.value = WS_STATUS.DISCONNECTED
+      return
+    }
+    if (ws.value && (
+      ws.value.readyState === WebSocket.OPEN ||
+      ws.value.readyState === WebSocket.CONNECTING
+    )) return
 
     intentionalClose = false
     status.value = reconnectAttempts > 0 ? WS_STATUS.RECONNECTING : WS_STATUS.CONNECTING
@@ -47,6 +81,11 @@ export function useWebSocket(roomId) {
     ws.value = socket
 
     socket.onopen = () => {
+      if (shouldStayDead()) {
+        try { socket.close() } catch { /* ignore */ }
+        status.value = WS_STATUS.DISCONNECTED
+        return
+      }
       status.value = WS_STATUS.CONNECTED
       reconnectAttempts = 0
     }
@@ -54,19 +93,43 @@ export function useWebSocket(roomId) {
     socket.onmessage = (event) => {
       try {
         const data = JSON.parse(event.data)
-        messageHandlers.forEach(fn => fn(data))
+        // Process KICKED before any other handlers can trigger side effects
+        if (data?.action === 'KICKED') {
+          permanentClose = true
+          intentionalClose = true
+          markRoomKicked(roomKey)
+          clearReconnect()
+        }
+        messageHandlers.forEach(fn => {
+          try { fn(data) } catch (e) { console.error('[WS] handler error', e) }
+        })
       } catch (err) {
         console.warn('[WS] Failed to parse message:', event.data)
       }
     }
 
-    socket.onclose = () => {
+    socket.onclose = (ev) => {
+      // Ignore stale sockets
+      if (ws.value && ws.value !== socket) return
       status.value = WS_STATUS.DISCONNECTED
-      if (!intentionalClose && reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
+      ws.value = null
+
+      // Close code 1000 with reason kicked, or permanent flag
+      const reason = (ev && ev.reason) || ''
+      if (reason.toLowerCase().includes('kick')) {
+        permanentClose = true
+        markRoomKicked(roomKey)
+      }
+
+      if (shouldStayDead()) return
+
+      if (reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
         const delay = Math.min(1000 * 2 ** reconnectAttempts, 30000)
         reconnectAttempts++
         status.value = WS_STATUS.RECONNECTING
-        reconnectTimer = setTimeout(connect, delay)
+        reconnectTimer = setTimeout(() => {
+          if (!shouldStayDead()) connect()
+        }, delay)
       }
     }
 
@@ -75,12 +138,23 @@ export function useWebSocket(roomId) {
     }
   }
 
-  function disconnect() {
+  function disconnect(opts = {}) {
+    if (opts.permanent) {
+      permanentClose = true
+      markRoomKicked(roomKey)
+    }
     intentionalClose = true
-    clearTimeout(reconnectTimer)
-    if (ws.value) {
-      ws.value.close()
-      ws.value = null
+    clearReconnect()
+    reconnectAttempts = MAX_RECONNECT_ATTEMPTS
+    const socket = ws.value
+    ws.value = null
+    if (socket) {
+      try {
+        socket.onclose = null
+        socket.onmessage = null
+        socket.onerror = null
+        socket.close()
+      } catch { /* ignore */ }
     }
     status.value = WS_STATUS.DISCONNECTED
   }
@@ -111,10 +185,11 @@ export function useWebSocket(roomId) {
 
   // Handle browser online/offline events for auto-reconnection
   const handleOnline = () => {
-    if (!intentionalClose && (!ws.value || ws.value.readyState !== WebSocket.OPEN)) {
+    if (permanentClose || intentionalClose) return
+    if (!ws.value || ws.value.readyState !== WebSocket.OPEN) {
       console.log('[WS] Internet connection restored. Reconnecting WebSocket immediately...')
       reconnectAttempts = 0
-      clearTimeout(reconnectTimer)
+      clearReconnect()
       connect()
     }
   }

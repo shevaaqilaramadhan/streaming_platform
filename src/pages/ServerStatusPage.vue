@@ -15,19 +15,6 @@
         </svg>
         <span class="nav-brand">WatchParty</span>
       </router-link>
-      <button
-        class="hamburger-btn"
-        aria-label="Toggle navigation menu"
-        :aria-expanded="mobileMenuOpen"
-        @click="mobileMenuOpen = !mobileMenuOpen"
-      >
-        <svg v-if="!mobileMenuOpen" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
-          <line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/>
-        </svg>
-        <svg v-else width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
-          <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
-        </svg>
-      </button>
       <nav class="nav-links" :class="{ 'nav-links--open': mobileMenuOpen }" aria-label="Main">
         <router-link to="/docs" class="nav-link" @click="mobileMenuOpen = false">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -56,6 +43,22 @@
           GitHub
         </a>
       </nav>
+      <div class="nav-right-controls">
+        <ThemeToggle />
+        <button
+          class="hamburger-btn"
+          aria-label="Toggle navigation menu"
+          :aria-expanded="mobileMenuOpen"
+          @click="mobileMenuOpen = !mobileMenuOpen"
+        >
+          <svg v-if="!mobileMenuOpen" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+            <line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/>
+          </svg>
+          <svg v-else width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+            <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+          </svg>
+        </button>
+      </div>
     </nav>
 
     <!-- Hero -->
@@ -224,6 +227,7 @@
 
 <script setup>
 import { ref, computed, h } from 'vue'
+import ThemeToggle from '../components/ThemeToggle.vue'
 
 const subscribed = ref(false)
 const mobileMenuOpen = ref(false)
@@ -412,7 +416,7 @@ function generateUptimeHistory(ratio) {
   padding: 0 var(--space-8);
   height: 56px;
   position: sticky; top: 0; z-index: var(--z-overlay);
-  background: rgba(10, 11, 16, 0.8);
+  background: color-mix(in srgb, var(--color-bg-base) 82%, transparent);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
   border-bottom: 1px solid var(--color-glass-border);
@@ -425,7 +429,12 @@ function generateUptimeHistory(ratio) {
   font-size: 1.05rem; font-weight: 700; letter-spacing: -0.02em;
   color: var(--text-primary);
 }
-.nav-links { display: flex; align-items: center; gap: var(--space-1); }
+.nav-links { display: flex; align-items: center; gap: var(--space-1); margin-left: auto; }
+.nav-right-controls {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
 .hamburger-btn {
   display: none;
   align-items: center;
@@ -441,7 +450,7 @@ function generateUptimeHistory(ratio) {
 }
 .hamburger-btn:hover {
   color: var(--text-primary);
-  background: rgba(255, 255, 255, 0.05);
+  background: var(--color-glass-hover);
 }
 .nav-link {
   display: inline-flex; align-items: center; gap: 5px;
@@ -452,11 +461,11 @@ function generateUptimeHistory(ratio) {
 }
 .nav-link:hover {
   color: var(--text-primary);
-  background: rgba(255, 255, 255, 0.05);
+  background: var(--color-glass-hover);
 }
 .nav-link.active {
   color: var(--text-primary);
-  background: rgba(255, 255, 255, 0.08);
+  background: var(--color-glass-hover);
 }
 .nav-link svg { opacity: 0.7; }
 .nav-link:hover svg, .nav-link.active svg { opacity: 1; }
@@ -828,7 +837,7 @@ function generateUptimeHistory(ratio) {
     flex-direction: column;
     align-items: stretch;
     gap: 0;
-    background: rgba(10, 11, 16, 0.95);
+    background: color-mix(in srgb, var(--color-bg-base) 95%, transparent);
     backdrop-filter: blur(20px);
     -webkit-backdrop-filter: blur(20px);
     border-bottom: 1px solid var(--color-glass-border);
@@ -846,5 +855,19 @@ function generateUptimeHistory(ratio) {
   }
   .subscribe-content { flex-direction: column; }
   .service-header { flex-wrap: wrap; }
+}
+
+@media (max-width: 414px) {
+  .summary-grid { grid-template-columns: 1fr; }
+  .status-content { padding: 0 var(--space-3) var(--space-12); }
+  .service-header {
+    gap: var(--space-3);
+  }
+  .service-metrics {
+    flex-wrap: wrap;
+    gap: var(--space-3);
+  }
+  .chart-bars { height: 100px; }
+  .chart-label { display: none; }
 }
 </style>

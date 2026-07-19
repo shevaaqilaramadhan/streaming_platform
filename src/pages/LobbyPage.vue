@@ -17,6 +17,7 @@
       </div>
       <div class="nav-right">
         <router-link to="/" class="nav-link">Home</router-link>
+        <ThemeToggle />
       </div>
     </nav>
 
@@ -111,6 +112,7 @@
 <script setup>
 import { ref, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
+import ThemeToggle from '../components/ThemeToggle.vue'
 
 const router = useRouter()
 const rooms = ref([])
@@ -161,6 +163,38 @@ onUnmounted(() => {
   padding-bottom: var(--space-16);
 }
 
+.home-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 var(--space-6);
+  height: 56px;
+}
+
+.nav-logo {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.nav-right {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin-left: auto;
+}
+
+.nav-link {
+  color: var(--text-secondary);
+  font-weight: 500;
+  font-size: 0.875rem;
+  text-decoration: none;
+}
+
+.nav-link:hover {
+  color: var(--text-primary);
+}
+
 .lobby-header {
   text-align: center;
   padding: var(--space-10) var(--space-4) var(--space-6);
@@ -208,6 +242,20 @@ onUnmounted(() => {
   max-width: 1200px;
   margin: 0 auto;
   padding: 0 var(--space-6);
+}
+
+@media (max-width: 414px) {
+  .room-grid {
+    padding: 0 var(--space-3);
+    gap: var(--space-4);
+    grid-template-columns: 1fr;
+  }
+  .lobby-header {
+    padding: var(--space-8) var(--space-3) var(--space-4);
+  }
+  .lobby-title {
+    font-size: 1.6rem;
+  }
 }
 
 .room-card {

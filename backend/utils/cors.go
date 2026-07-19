@@ -52,7 +52,8 @@ func AllowedOrigins() map[string]struct{} {
 
 // IsOriginAllowed mirrors HTTP CORS rules for WebSocket CheckOrigin.
 // Empty origin is allowed (non-browser / same-origin tooling).
-// When CORS_ORIGINS is unset, any localhost / 127.0.0.1 port is allowed.
+// When CORS_ORIGINS is unset, any localhost / 127.0.0.1 / ::1 port is allowed
+// (including Vite proxy rewrites to the backend port).
 func IsOriginAllowed(origin string) bool {
 	if origin == "" {
 		return true
@@ -62,10 +63,32 @@ func IsOriginAllowed(origin string) bool {
 		return true
 	}
 	if os.Getenv("CORS_ORIGINS") == "" {
-		if strings.HasPrefix(origin, "http://localhost:") ||
-			strings.HasPrefix(origin, "http://127.0.0.1:") {
+		if isLocalDevOrigin(origin) {
 			return true
 		}
+	}
+	return false
+}
+
+func isLocalDevOrigin(origin string) bool {
+	prefixes := []string{
+		"http://localhost:",
+		"https://localhost:",
+		"http://127.0.0.1:",
+		"https://127.0.0.1:",
+		"http://[::1]:",
+		"https://[::1]:",
+	}
+	for _, p := range prefixes {
+		if strings.HasPrefix(origin, p) {
+			return true
+		}
+	}
+	// Bare host without port (rare)
+	switch origin {
+	case "http://localhost", "https://localhost",
+		"http://127.0.0.1", "https://127.0.0.1":
+		return true
 	}
 	return false
 }

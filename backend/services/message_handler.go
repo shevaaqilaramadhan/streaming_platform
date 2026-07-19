@@ -13,25 +13,39 @@ import (
 	"unicode/utf8"
 	"watchparty-backend/models"
 	"watchparty-backend/utils"
+
+	"github.com/gorilla/websocket"
 )
 
 const (
 	maxChatTextLen       = 500
 	maxQueueSize         = 50
 	maxUsernameLen       = 32
+	maxRoomNameLen       = 64
+	maxEmojiLen          = 8
 	episodeEndedDebounce = 3 * time.Second
 )
 
 var (
 	lastEpisodeEnded sync.Map // roomID -> *atomic.Int64 (unix nano)
 	usernamePattern  = regexp.MustCompile(`^[a-zA-Z0-9_\- .]+$`)
+	roomNamePattern  = regexp.MustCompile(`^[\p{L}\p{N}_\- .!?'"&()]+$`)
 	urlSchemePattern = regexp.MustCompile(`^https?://`)
+	// Common emoji / short reaction tokens (single grapheme or short text).
+	allowedReactions = map[string]struct{}{
+		"👍": {}, "👎": {}, "❤️": {}, "🔥": {}, "😂": {}, "😮": {}, "😢": {}, "👏": {},
+		"🎉": {}, "💯": {}, "👀": {}, "✨": {}, "🤣": {}, "😍": {}, "🤔": {}, "💀": {},
+		"+1": {}, "-1": {}, "lol": {}, "wow": {}, "gg": {}, "rip": {},
+	}
 
 	// Per-user WS action limits (in-memory token buckets).
 	// chat: ~20/min, setVideo/scrape: ~6/min, queue add: ~10/min
+	// reaction: ~30/min, typing: ~1 per 2s
 	chatRateLimit     = utils.NewTokenBucket(20.0/60.0, 5)
 	setVideoRateLimit = utils.NewTokenBucket(6.0/60.0, 2)
 	queueRateLimit    = utils.NewTokenBucket(10.0/60.0, 3)
+	reactionRateLimit = utils.NewTokenBucket(30.0/60.0, 5)
+	typingRateLimit   = utils.NewTokenBucket(0.5, 1)
 )
 
 func isYouTubeURL(url string) bool {
@@ -110,6 +124,16 @@ func HandleMessage(user *models.User, room *models.WatchRoom, msgBytes []byte) {
 		handleEpisodeEnded(user, room, msg.Payload)
 	case "TOGGLE_PUBLIC":
 		handleTogglePublic(user, room, msg.Payload)
+	case "TRANSFER_HOST":
+		handleTransferHost(user, room, msg.Payload)
+	case "KICK_USER":
+		handleKickUser(user, room, msg.Payload)
+	case "SET_ROOM_NAME":
+		handleSetRoomName(user, room, msg.Payload)
+	case "REACTION":
+		handleReaction(user, room, msg.Payload)
+	case "TYPING":
+		handleTyping(user, room, msg.Payload)
 	default:
 		log.Println("Unknown action:", msg.Action)
 	}
@@ -154,6 +178,7 @@ func handleJoinEvent(user *models.User, room *models.WatchRoom, payloadRaw json.
 	isPublic := room.IsPublic
 	hostID := room.HostID
 	isHost := user.IsHost
+	roomName := room.RoomName
 	room.Mutex.Unlock()
 
 	currentVideo, currentTime, isPlaying, participants, metadata, queue := GetRoomState(room.RoomID)
@@ -162,6 +187,7 @@ func handleJoinEvent(user *models.User, room *models.WatchRoom, payloadRaw json.
 		Action: "ROOM_INIT",
 		Payload: json.RawMessage(mustMarshal(models.RoomInitPayload{
 			RoomID:       room.RoomID,
+			RoomName:     roomName,
 			CurrentVideo: currentVideo,
 			CurrentTime:  currentTime,
 			IsPlaying:    isPlaying,
@@ -329,6 +355,7 @@ func processSetVideo(user *models.User, room *models.WatchRoom, payload models.S
 	var metadata *models.VideoMetadata
 
 	if !isYouTubeURL(payload.URL) && !isDirectStreamURL(payload.URL) {
+		broadcastScrapeStarted(room, payload.URL, "Resolving stream URL…")
 		log.Printf("Scraping anime page: %s", payload.URL)
 		scraped, err := ScrapeStreamURLCached(payload.URL)
 		if err != nil {
@@ -345,6 +372,7 @@ func processSetVideo(user *models.User, room *models.WatchRoom, payload models.S
 		}
 		log.Printf("Scrape succeeded: %s - %s", scraped.Title, scraped.Episode)
 		metadata = scraped
+		broadcastScrapeFinished(room, payload.URL)
 	} else {
 		metadata = &models.VideoMetadata{
 			VideoURL: payload.URL,
@@ -403,6 +431,11 @@ func processAddToQueue(user *models.User, room *models.WatchRoom, pageURL string
 		return
 	}
 
+	needsScrape := !isYouTubeURL(pageURL) && !isDirectStreamURL(pageURL)
+	if needsScrape {
+		broadcastScrapeStarted(room, pageURL, "Resolving stream URL…")
+	}
+
 	queueItem, err := AddToQueue(room.RoomID, pageURL)
 	if err != nil {
 		log.Printf("Failed to add to queue: %v", err)
@@ -415,6 +448,10 @@ func processAddToQueue(user *models.User, room *models.WatchRoom, pageURL string
 		}
 		SendToUser(user, mustMarshal(errMsg))
 		return
+	}
+
+	if needsScrape {
+		broadcastScrapeFinished(room, pageURL)
 	}
 
 	queue := GetQueue(room.RoomID)
@@ -568,6 +605,277 @@ func handleTogglePublic(user *models.User, room *models.WatchRoom, payloadRaw js
 		}),
 	}
 	BroadcastToRoom(room, mustMarshal(broadcastMsg), nil)
+}
+
+func handleTransferHost(user *models.User, room *models.WatchRoom, payloadRaw json.RawMessage) {
+	if !user.IsHost {
+		log.Printf("Non-host %s tried to TRANSFER_HOST", user.Username)
+		return
+	}
+
+	var payload models.TransferHostPayload
+	if err := json.Unmarshal(payloadRaw, &payload); err != nil {
+		log.Println("Invalid TRANSFER_HOST payload:", err)
+		return
+	}
+
+	targetID := strings.TrimSpace(payload.TargetUserID)
+	if targetID == "" || targetID == user.ID {
+		return
+	}
+
+	room.Mutex.Lock()
+	target, ok := room.Clients[targetID]
+	if !ok {
+		room.Mutex.Unlock()
+		log.Printf("TRANSFER_HOST: target %s not in room %s", targetID, room.RoomID)
+		return
+	}
+	if room.HostID != user.ID {
+		room.Mutex.Unlock()
+		log.Printf("TRANSFER_HOST: %s is no longer host of %s", user.Username, room.RoomID)
+		return
+	}
+
+	if oldHost, exists := room.Clients[room.HostID]; exists {
+		oldHost.IsHost = false
+	}
+	user.IsHost = false
+	target.IsHost = true
+	room.HostID = target.ID
+	newHostID := target.ID
+	newHostUsername := target.Username
+	room.Mutex.Unlock()
+
+	log.Printf("Host transferred in room %s: %s -> %s (%s)", room.RoomID, user.Username, newHostUsername, newHostID)
+
+	broadcastMsg := models.Message{
+		Action: "HOST_CHANGED",
+		Payload: mustMarshalRaw(models.HostChangedPayload{
+			RoomID:    room.RoomID,
+			NewHostID: newHostID,
+			Username:  newHostUsername,
+		}),
+	}
+	BroadcastToRoom(room, mustMarshal(broadcastMsg), nil)
+}
+
+func handleKickUser(user *models.User, room *models.WatchRoom, payloadRaw json.RawMessage) {
+	if !user.IsHost {
+		log.Printf("Non-host %s tried to KICK_USER", user.Username)
+		return
+	}
+
+	var payload models.KickUserPayload
+	if err := json.Unmarshal(payloadRaw, &payload); err != nil {
+		log.Println("Invalid KICK_USER payload:", err)
+		return
+	}
+
+	targetID := strings.TrimSpace(payload.TargetUserID)
+	if targetID == "" || targetID == user.ID {
+		log.Printf("KICK_USER: host cannot kick self")
+		return
+	}
+
+	room.Mutex.RLock()
+	target, ok := room.Clients[targetID]
+	isHostTarget := ok && room.HostID == targetID
+	room.Mutex.RUnlock()
+	if !ok {
+		log.Printf("KICK_USER: target %s not in room %s", targetID, room.RoomID)
+		return
+	}
+	if isHostTarget {
+		log.Printf("KICK_USER: refuse kicking current host without transfer")
+		return
+	}
+
+	targetUsername := target.Username
+	roomID := room.RoomID
+	conn := target.Conn
+
+	kickedMsg := models.Message{
+		Action: "KICKED",
+		Payload: mustMarshalRaw(models.KickedPayload{
+			RoomID: roomID,
+			Reason: "kicked_by_host",
+		}),
+	}
+	// Enqueue via writePump only (never WriteMessage concurrently — not thread-safe).
+	SendToUser(target, mustMarshal(kickedMsg))
+
+	// Prevent readPump defer from re-broadcasting USER_LEFT after we close the conn.
+	target.Username = ""
+	RemoveUserFromRoom(roomID, targetID)
+
+	leftMsg := models.Message{
+		Action: "USER_LEFT",
+		Payload: mustMarshalRaw(models.UserLeftPayload{
+			UserID:   targetID,
+			Username: targetUsername,
+		}),
+	}
+	if r, ok := GetRoom(roomID); ok {
+		BroadcastToRoom(r, mustMarshal(leftMsg), nil)
+	}
+
+	// Allow writePump to flush KICKED before TCP close so client can set permanentClose.
+	// Without this delay, onclose races ahead of onmessage → auto-reconnect.
+	go func() {
+		time.Sleep(500 * time.Millisecond)
+		if conn != nil {
+			_ = conn.WriteControl(
+				websocket.CloseMessage,
+				websocket.FormatCloseMessage(websocket.CloseNormalClosure, "kicked"),
+				time.Now().Add(2*time.Second),
+			)
+			_ = conn.Close()
+		}
+	}()
+
+	log.Printf("User %s (%s) kicked from room %s by host %s", targetUsername, targetID, roomID, user.Username)
+}
+
+func handleSetRoomName(user *models.User, room *models.WatchRoom, payloadRaw json.RawMessage) {
+	if !user.IsHost {
+		log.Printf("Non-host %s tried to SET_ROOM_NAME", user.Username)
+		return
+	}
+
+	var payload models.SetRoomNamePayload
+	if err := json.Unmarshal(payloadRaw, &payload); err != nil {
+		log.Println("Invalid SET_ROOM_NAME payload:", err)
+		return
+	}
+
+	name, ok := sanitizeRoomName(payload.RoomName)
+	if !ok {
+		log.Printf("SET_ROOM_NAME: invalid name from %s", user.Username)
+		return
+	}
+
+	room.Mutex.Lock()
+	room.RoomName = name
+	room.Mutex.Unlock()
+
+	log.Printf("Room %s renamed to %q by host %s", room.RoomID, name, user.Username)
+
+	broadcastMsg := models.Message{
+		Action: "ROOM_NAME_CHANGED",
+		Payload: mustMarshalRaw(models.RoomNameChangedPayload{
+			RoomID:   room.RoomID,
+			RoomName: name,
+		}),
+	}
+	BroadcastToRoom(room, mustMarshal(broadcastMsg), nil)
+}
+
+func handleReaction(user *models.User, room *models.WatchRoom, payloadRaw json.RawMessage) {
+	if !reactionRateLimit.Allow(user.ID) {
+		return
+	}
+
+	var payload models.ReactionPayload
+	if err := json.Unmarshal(payloadRaw, &payload); err != nil {
+		log.Println("Invalid REACTION payload:", err)
+		return
+	}
+
+	emoji := strings.TrimSpace(payload.Emoji)
+	if !isValidReaction(emoji) {
+		return
+	}
+
+	broadcastMsg := models.Message{
+		Action: "REACTION",
+		Payload: mustMarshalRaw(models.ReactionBroadcastPayload{
+			RoomID:   room.RoomID,
+			UserID:   user.ID,
+			Username: user.Username,
+			Emoji:    emoji,
+		}),
+	}
+	BroadcastToRoom(room, mustMarshal(broadcastMsg), nil)
+}
+
+func handleTyping(user *models.User, room *models.WatchRoom, payloadRaw json.RawMessage) {
+	if !typingRateLimit.Allow(user.ID) {
+		return
+	}
+
+	var payload models.TypingPayload
+	if err := json.Unmarshal(payloadRaw, &payload); err != nil {
+		log.Println("Invalid TYPING payload:", err)
+		return
+	}
+
+	broadcastMsg := models.Message{
+		Action: "TYPING",
+		Payload: mustMarshalRaw(models.TypingBroadcastPayload{
+			UserID:   user.ID,
+			Username: user.Username,
+		}),
+	}
+	BroadcastToRoom(room, mustMarshal(broadcastMsg), user)
+}
+
+func sanitizeRoomName(name string) (string, bool) {
+	name = strings.TrimSpace(name)
+	if name == "" {
+		return "", true
+	}
+	if utf8.RuneCountInString(name) > maxRoomNameLen {
+		runes := []rune(name)
+		name = string(runes[:maxRoomNameLen])
+	}
+	// Reject control chars and HTML-ish brackets; allow unicode letters/numbers.
+	for _, r := range name {
+		if r < 0x20 || r == 0x7f || r == '<' || r == '>' {
+			return "", false
+		}
+	}
+	return name, true
+}
+
+func isValidReaction(emoji string) bool {
+	if emoji == "" {
+		return false
+	}
+	if utf8.RuneCountInString(emoji) > maxEmojiLen {
+		return false
+	}
+	if _, ok := allowedReactions[emoji]; ok {
+		return true
+	}
+	// Allow single emoji-like grapheme (no control/space chars).
+	for _, r := range emoji {
+		if r < 0x20 || r == 0x7f {
+			return false
+		}
+	}
+	return utf8.RuneCountInString(emoji) <= 4
+}
+
+func broadcastScrapeStarted(room *models.WatchRoom, originalURL, message string) {
+	msg := models.Message{
+		Action: "SCRAPE_STARTED",
+		Payload: mustMarshalRaw(models.ScrapeStartedPayload{
+			OriginalURL: originalURL,
+			Message:     message,
+		}),
+	}
+	BroadcastToRoom(room, mustMarshal(msg), nil)
+}
+
+func broadcastScrapeFinished(room *models.WatchRoom, originalURL string) {
+	msg := models.Message{
+		Action: "SCRAPE_FINISHED",
+		Payload: mustMarshalRaw(map[string]interface{}{
+			"originalUrl": originalURL,
+		}),
+	}
+	BroadcastToRoom(room, mustMarshal(msg), nil)
 }
 
 func extractDomainFromURL(rawURL string) string {

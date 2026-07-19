@@ -221,10 +221,10 @@ func RemoveUserFromRoom(roomID, userID string) {
 func broadcastHostChanged(room *models.WatchRoom, roomID, newHostID, newHostUsername string) {
 	hostChangedMsg := models.Message{
 		Action: "HOST_CHANGED",
-		Payload: mustMarshalRaw(map[string]interface{}{
-			"roomId":    roomID,
-			"newHostId": newHostID,
-			"username":  newHostUsername,
+		Payload: mustMarshalRaw(models.HostChangedPayload{
+			RoomID:    roomID,
+			NewHostID: newHostID,
+			Username:  newHostUsername,
 		}),
 	}
 	BroadcastToRoom(room, mustMarshal(hostChangedMsg), nil)

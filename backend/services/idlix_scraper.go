@@ -23,7 +23,8 @@ const (
 	idlixDefaultBaseURL = "https://z2.idlixku.com"
 	idlixMobileUA       = "Mozilla/5.0 (Linux; Android 6.0; Nexus 5 Build/MRA58N) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Mobile Safari/537.36"
 	idlixGateMaxWait    = 20 * time.Second
-	idlixBrowserTimeout = 90 * time.Second // includes ~15s gate delay + API steps
+	// Warm navigation + gate (~15s) + API steps + optional claim retry
+	idlixBrowserTimeout = 120 * time.Second
 )
 
 // idlixParsedURL holds content coordinates extracted from an IDLIX page URL.
@@ -144,7 +145,13 @@ func scrapeIdlix(pageURL string) (*models.VideoMetadata, error) {
 		return nil, fmt.Errorf("IDLIX scrape queue full — try again shortly")
 	}
 
-	sess, err := newIdlixBrowserSession(parsed.BaseURL)
+	// Warm on the real page URL first (series often has no /season/N/episode/M path).
+	// Origin must be idlix host so session/claim is same-site.
+	warm := parsed.PageURL
+	if warm == "" {
+		warm = parsed.Referer
+	}
+	sess, err := newIdlixBrowserSession(parsed.BaseURL, warm)
 	if err != nil {
 		return nil, err
 	}
@@ -186,7 +193,7 @@ type idlixBrowserSession struct {
 	cancel      context.CancelFunc
 }
 
-func newIdlixBrowserSession(baseURL string) (*idlixBrowserSession, error) {
+func newIdlixBrowserSession(baseURL, warmURL string) (*idlixBrowserSession, error) {
 	if findChromePath() == "" {
 		return nil, fmt.Errorf("Chrome/Chromium not installed — required for IDLIX Cloudflare bypass")
 	}
@@ -209,8 +216,12 @@ func newIdlixBrowserSession(baseURL string) (*idlixBrowserSession, error) {
 		cancel:      cancel,
 	}
 
-	// Warm session: enable network + hide webdriver. Skip full homepage navigation
-	// (CF challenge can hang 15-30s); fetch() on same origin still works with cookies later.
+	// Must land on the IDLIX origin so subsequent fetch() is same-site.
+	// Claiming session from about:blank is treated as cross-site → HTTP 403
+	// {"error":"Cross-site request blocked"}.
+	if warmURL == "" {
+		warmURL = baseURL + "/"
+	}
 	if err := chromedp.Run(ctx,
 		network.Enable(),
 		injectWebdriverBypass(),
@@ -219,7 +230,61 @@ func newIdlixBrowserSession(baseURL string) (*idlixBrowserSession, error) {
 		return nil, fmt.Errorf("IDLIX browser session failed: %w", err)
 	}
 
+	if err := s.warmOrigin(warmURL); err != nil {
+		s.close()
+		return nil, err
+	}
+
 	return s, nil
+}
+
+// warmOrigin navigates Chromium onto the IDLIX site so document origin matches
+// API host (required for session/claim CSRF + cookie jar).
+func (s *idlixBrowserSession) warmOrigin(pageURL string) error {
+	log.Printf("[IDLIX] Warming browser origin via %s", pageURL)
+
+	// Bounded wait: CF sometimes hangs; prefer partial load over infinite stall.
+	navCtx, navCancel := context.WithTimeout(s.ctx, 25*time.Second)
+	defer navCancel()
+
+	err := chromedp.Run(navCtx,
+		chromedp.Navigate(pageURL),
+		chromedp.WaitReady("body", chromedp.ByQuery),
+	)
+	if err != nil {
+		// Fallback: try site root if episode/series page fails (redirects / CF)
+		root := s.baseURL + "/"
+		if pageURL != root {
+			log.Printf("[IDLIX] Warm page failed (%v); retrying base %s", err, root)
+			navCtx2, cancel2 := context.WithTimeout(s.ctx, 20*time.Second)
+			defer cancel2()
+			if err2 := chromedp.Run(navCtx2,
+				chromedp.Navigate(root),
+				chromedp.WaitReady("body", chromedp.ByQuery),
+			); err2 != nil {
+				return fmt.Errorf("IDLIX warm navigation failed: %w (root: %v)", err, err2)
+			}
+		} else {
+			return fmt.Errorf("IDLIX warm navigation failed: %w", err)
+		}
+	}
+
+	// Brief settle for Set-Cookie / CF clearance
+	select {
+	case <-time.After(800 * time.Millisecond):
+	case <-s.ctx.Done():
+		return s.ctx.Err()
+	}
+
+	// Confirm we are on the expected origin (not stuck on interstitial with wrong host)
+	var loc string
+	_ = chromedp.Run(s.ctx, chromedp.Location(&loc))
+	if loc != "" && !strings.Contains(strings.ToLower(loc), "idlix") {
+		log.Printf("[IDLIX] Warning: browser location after warm is %q (expected idlix host)", loc)
+	} else {
+		log.Printf("[IDLIX] Browser origin ready at %s", loc)
+	}
+	return nil
 }
 
 func (s *idlixBrowserSession) close() {
@@ -239,6 +304,7 @@ type browserFetchResult struct {
 }
 
 // browserFetch runs fetch() inside Chromium so TLS fingerprint matches CF expectations.
+// Caller must have warmed the page onto the IDLIX origin (same-site cookies + CSRF).
 func (s *idlixBrowserSession) browserFetch(reqURL, method, body string, headers map[string]string) (*browserFetchResult, error) {
 	if s.ctx.Err() != nil {
 		return nil, fmt.Errorf("browser session expired: %w", s.ctx.Err())
@@ -257,6 +323,10 @@ func (s *idlixBrowserSession) browserFetch(reqURL, method, body string, headers 
 	if _, ok := headers["accept-language"]; !ok {
 		headers["accept-language"] = "en-US,en;q=0.9"
 	}
+	// Never set Origin manually — browser forbids overriding it and IDLIX rejects
+	// forged/cross-site origins with "Cross-site request blocked".
+	delete(headers, "origin")
+	delete(headers, "Origin")
 
 	payload := map[string]interface{}{
 		"url":     reqURL,
@@ -270,13 +340,18 @@ func (s *idlixBrowserSession) browserFetch(reqURL, method, body string, headers 
 	}
 
 	// Async fetch inside Chromium (TLS fingerprint matches CF). AwaitPromise is required.
+	// mode: cors + credentials from document origin (must be idlix after warmOrigin).
 	js := fmt.Sprintf(`
 		(async () => {
 			const p = %s;
+			const hdrs = Object.assign({}, p.headers || {});
+			delete hdrs.origin;
+			delete hdrs.Origin;
 			const opts = {
 				method: p.method || 'GET',
-				headers: p.headers || {},
+				headers: hdrs,
 				credentials: 'include',
+				mode: 'cors',
 			};
 			if (p.body && p.method && p.method.toUpperCase() !== 'GET' && p.method.toUpperCase() !== 'HEAD') {
 				opts.body = p.body;
@@ -421,7 +496,6 @@ func (s *idlixBrowserSession) trackView(contentType, contentID, referer, episode
 	apiURL := s.baseURL + "/api/views/track"
 	res, err := s.browserFetch(apiURL, "POST", string(bodyBytes), map[string]string{
 		"content-type": "application/json",
-		"origin":       s.baseURL,
 		"referer":      referer,
 	})
 	if err != nil {
@@ -480,13 +554,26 @@ func (s *idlixBrowserSession) runStreamTail(playInfoType, uuid, referer, label s
 	claimBody, _ := json.Marshal(map[string]string{"gateToken": gateToken})
 	log.Printf("[IDLIX] Step 5: POST %s", claimURL)
 
+	// Same-origin POST: Origin is set by the browser after warmOrigin (do not forge).
 	claimData, _, err := s.browserFetchJSON(claimURL, "POST", string(claimBody), map[string]string{
-		"content-type": "application/json",
-		"origin":       s.baseURL,
-		"referer":      referer,
+		"content-type":     "application/json",
+		"referer":          referer,
+		"x-requested-with": "XMLHttpRequest",
 	})
 	if err != nil {
-		return nil, fmt.Errorf("IDLIX step 5 (session claim) failed: %w", err)
+		// One retry after re-warming origin (CF cookie may have expired mid-gate wait)
+		log.Printf("[IDLIX] Step 5 claim failed (%v); re-warming origin and retrying once", err)
+		if warmErr := s.warmOrigin(referer); warmErr != nil {
+			return nil, fmt.Errorf("IDLIX step 5 (session claim) failed: %w (re-warm: %v)", err, warmErr)
+		}
+		claimData, _, err = s.browserFetchJSON(claimURL, "POST", string(claimBody), map[string]string{
+			"content-type":     "application/json",
+			"referer":          referer,
+			"x-requested-with": "XMLHttpRequest",
+		})
+		if err != nil {
+			return nil, fmt.Errorf("IDLIX step 5 (session claim) failed: %w", err)
+		}
 	}
 
 	claim := pickString(claimData, "claim")

@@ -56,6 +56,11 @@
     </div>
 
     <!-- Input area -->
+    <div class="typing-indicator" v-if="typingDisplay">
+      <span class="typing-dot"></span>
+      <span class="typing-text">{{ typingDisplay }}</span>
+    </div>
+
     <div class="chat-input-area" :class="{ 'chat-input-area--disabled': !isConnected }">
       <input
         id="chat-input"
@@ -67,6 +72,7 @@
         maxlength="300"
         :disabled="!isConnected"
         @keydown.enter="sendMessage"
+        @input="onInput"
         aria-label="Chat message input"
       />
       <button
@@ -86,30 +92,47 @@
 </template>
 
 <script setup>
-import { ref, watch, nextTick } from 'vue'
+import { ref, watch, nextTick, computed } from 'vue'
 
 const props = defineProps({
-  messages:    { type: Array,   default: () => [] },
-  isConnected: { type: Boolean, default: false },
-  nickname:    { type: String,  required: true },
+  messages:     { type: Array,   default: () => [] },
+  isConnected:  { type: Boolean, default: false },
+  nickname:     { type: String,  required: true },
+  typingUsers:  { type: Array,   default: () => [] },
 })
 
-const emit = defineEmits(['send'])
+const emit = defineEmits(['send', 'typing'])
 
 const inputText  = ref('')
 const messagesEl = ref(null)
 const inputRef   = ref(null)
+let typingDebounce = null
 
-/* Auto-scroll to bottom on new messages */
+function isNearBottom(el, threshold = 120) {
+  return el.scrollHeight - el.scrollTop - el.clientHeight < threshold
+}
+
+/* Auto-scroll: check near-bottom before DOM grows, then scroll after nextTick */
 watch(
   () => props.messages.length,
   async () => {
+    const el = messagesEl.value
+    if (!el) return
+    const wasNearBottom = isNearBottom(el)
     await nextTick()
-    if (messagesEl.value) {
-      messagesEl.value.scrollTop = messagesEl.value.scrollHeight
+    if (wasNearBottom) {
+      el.scrollTop = el.scrollHeight
     }
   }
 )
+
+/* Debounce typing event */
+function onInput() {
+  clearTimeout(typingDebounce)
+  typingDebounce = setTimeout(() => {
+    emit('typing')
+  }, 300)
+}
 
 function sendMessage() {
   const text = inputText.value.trim()
@@ -117,6 +140,12 @@ function sendMessage() {
   emit('send', text)
   inputText.value = ''
   inputRef.value?.focus()
+  clearTimeout(typingDebounce)
+  /* Always scroll to bottom when user sends a message */
+  nextTick(() => {
+    const el = messagesEl.value
+    if (el) el.scrollTop = el.scrollHeight
+  })
 }
 
 /* Deterministic colour per username */
@@ -136,6 +165,15 @@ function formatTime(ts) {
   const d = new Date(ts)
   return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
 }
+
+/* Typing indicator display */
+const typingDisplay = computed(() => {
+  const users = props.typingUsers
+  if (!users || users.length === 0) return ''
+  if (users.length === 1) return `${users[0].username} is typing…`
+  if (users.length === 2) return `${users[0].username} and ${users[1].username} are typing…`
+  return `${users[0].username} and ${users.length - 1} others are typing…`
+})
 </script>
 
 <style scoped>
@@ -257,6 +295,36 @@ function formatTime(ts) {
 .system-icon { color: var(--text-muted); opacity: 0.5; }
 
 /* Input */
+.typing-indicator {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-1) var(--space-4);
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  font-style: italic;
+  min-height: 22px;
+}
+
+.typing-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--color-primary);
+  animation: typing-pulse 1.2s ease-in-out infinite;
+}
+
+.typing-text {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+@keyframes typing-pulse {
+  0%, 100% { opacity: 0.4; transform: scale(0.8); }
+  50% { opacity: 1; transform: scale(1); }
+}
+
 .chat-input-area {
   display: flex;
   gap: var(--space-2);

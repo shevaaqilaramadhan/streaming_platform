@@ -23,9 +23,10 @@ dist-ssr
 *.sln
 *.sw?
 
-# Documentation & reports (keep README.md)
-*.md
-!README.md
+# Root-level markdown clutter (keep README at root)
+# Project docs live under docs/ and stay accessible (not ignored)
+/*.md
+!/README.md
 
 # Environment & credentials
 .env

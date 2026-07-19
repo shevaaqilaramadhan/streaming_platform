@@ -8,6 +8,22 @@
       </div>
     </Transition>
 
+    <!-- Error overlay (playback failure or invalid URL input) -->
+    <Transition name="fade">
+      <div v-if="streamError" class="video-error">
+        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+          <circle cx="12" cy="12" r="10"/>
+          <line x1="15" y1="9" x2="9" y2="15"/>
+          <line x1="9" y1="9" x2="15" y2="15"/>
+        </svg>
+        <p class="error-title">{{ videoUrl ? 'Unable to play video' : 'Invalid video URL' }}</p>
+        <p class="error-detail">{{ streamError }}</p>
+        <button v-if="isHost" class="btn btn-primary btn-sm error-cta" @click="clearErrorAndFocus">
+          Try another URL
+        </button>
+      </div>
+    </Transition>
+
     <!-- No video placeholder -->
     <div v-if="!videoUrl" class="video-placeholder">
       <div class="placeholder-icon">
@@ -16,8 +32,14 @@
           <rect x="1" y="5" width="15" height="14" rx="2" ry="2"/>
         </svg>
       </div>
-      <p v-if="isHost" class="placeholder-text">Paste a YouTube URL, stream link, or anime page URL</p>
-      <p v-else class="placeholder-text">Waiting for the host to start a video…</p>
+      <div v-if="isHost" class="placeholder-content">
+        <p class="placeholder-text">Paste a URL to start watching</p>
+        <p class="placeholder-hint">Supports YouTube, direct .mp4/.m3u8 links, and anime page URLs</p>
+      </div>
+      <div v-else class="placeholder-content">
+        <p class="placeholder-text">Waiting for the host to start a video…</p>
+        <p class="placeholder-hint">Sit tight — the host will pick something to watch</p>
+      </div>
     </div>
 
     <!-- YouTube iframe container -->
@@ -44,6 +66,7 @@
       @playing="isLoading = false"
       @loadedmetadata="onNativeLoadedMetadata"
       @ended="onNativeEnded"
+      @error="onNativeError"
     ></video>
 
     <!-- Custom controls overlay -->
@@ -193,35 +216,13 @@
       </div>
     </Transition>
 
-    <!-- Host: Set Video URL panel -->
-    <div v-if="isHost" class="video-url-panel glass">
-      <input
-        id="video-url-input"
-        v-model="newVideoUrl"
-        type="url"
-        class="input"
-        placeholder="YouTube URL, .m3u8 stream, .mp4 link, or anime page URL…"
-        @keydown.enter="submitVideoUrl"
-      />
-      <button
-        id="set-video-btn"
-        class="btn btn-primary btn-sm"
-        :disabled="!newVideoUrl.trim()"
-        @click="submitVideoUrl"
-      >
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <circle cx="12" cy="12" r="10"/><polygon points="10 8 16 12 10 16 10 8"/>
-        </svg>
-        Load Video
-      </button>
-    </div>
+    <!-- URL input lives on RoomPage (single host input — avoid double fields) -->
   </div>
 </template>
 
 <script setup>
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import Hls from 'hls.js'
-import { isValidVideoInput } from '../utils/videoInput.js'
 
 const props = defineProps({
   isHost:      { type: Boolean, default: false },
@@ -229,7 +230,7 @@ const props = defineProps({
   playerState: { type: Object,  default: () => ({ isPlaying: false, currentTime: 0 }) },
 })
 
-const emit = defineEmits(['sync', 'set-video', 'ended', 'error'])
+const emit = defineEmits(['sync', 'ended', 'error'])
 
 /* ================================================================
    State
@@ -245,7 +246,6 @@ const currentTime  = ref(0)
 const duration     = ref(0)
 const showControls = ref(true)
 const showPlayPulse = ref(false)
-const newVideoUrl  = ref('')
 const pendingSeekTime = ref(null)
 const videoMode    = ref(null)  // 'youtube' | 'hls' | 'native'
 const streamError  = ref(null)
@@ -452,6 +452,8 @@ function initHls(url) {
             break
           default:
             console.error('[HLS] Unrecoverable error')
+            streamError.value = 'An unrecoverable playback error occurred. The stream may be incompatible.'
+            emit('error', streamError.value)
             destroyHls()
             isLoading.value = false
             break
@@ -532,6 +534,29 @@ function onNativeLoadedMetadata() {
 function onNativeEnded() {
   if (props.isHost) {
     emit('ended')
+  }
+}
+
+function onNativeError() {
+  const vid = videoRef.value
+  const code = vid?.error?.code
+  const messages = {
+    1: 'Video playback was aborted.',
+    2: 'A network error occurred while loading the video.',
+    3: 'The video could not be decoded.',
+    4: 'The video format or source is not supported.',
+  }
+  streamError.value = messages[code] || 'An unknown error occurred while loading the video.'
+  isLoading.value = false
+  emit('error', streamError.value)
+}
+
+function clearErrorAndFocus() {
+  streamError.value = null
+  const urlInput = document.getElementById('room-video-url-input')
+  if (urlInput) {
+    urlInput.focus()
+    urlInput.select()
   }
 }
 
@@ -717,14 +742,6 @@ function hideControlsDelayed() {
   }, 3000)
 }
 
-function submitVideoUrl() {
-  const url = newVideoUrl.value.trim()
-  if (!url) return
-  if (!isValidVideoInput(url)) return
-  emit('set-video', url)
-  newVideoUrl.value = ''
-}
-
 function formatTime(secs) {
   if (!secs || isNaN(secs)) return '0:00'
   const m = Math.floor(secs / 60)
@@ -752,10 +769,19 @@ onUnmounted(() => {
   width: 100%;
   background: #000;
   border-radius: var(--radius-lg);
-  overflow: hidden;
+  overflow: visible;
   display: flex;
   flex-direction: column;
   box-shadow: var(--shadow-card), var(--shadow-glow-sm);
+}
+.video-wrapper > .player-container,
+.video-wrapper > .video-el,
+.video-wrapper > .video-placeholder,
+.video-wrapper > .video-loading,
+.video-wrapper > .video-error,
+.video-wrapper > .controls-overlay {
+  overflow: hidden;
+  border-radius: var(--radius-lg);
 }
 
 /* Player Container & IFrame sizing */
@@ -802,6 +828,22 @@ onUnmounted(() => {
   padding: 0 var(--space-4);
 }
 
+.placeholder-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.placeholder-hint {
+  color: var(--text-muted);
+  font-size: 0.8125rem;
+  text-align: center;
+  opacity: 0.6;
+  max-width: 320px;
+  line-height: 1.4;
+}
+
 /* Loading */
 .video-loading {
   position: absolute;
@@ -823,6 +865,42 @@ onUnmounted(() => {
   border-top-color: var(--color-primary);
   border-radius: 50%;
   animation: spin-slow 0.8s linear infinite;
+}
+
+/* Error overlay */
+.video-error {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-3);
+  background: rgba(0,0,0,0.85);
+  color: var(--text-secondary);
+  z-index: 3;
+  padding: var(--space-6);
+  text-align: center;
+}
+.video-error svg {
+  color: var(--color-accent-red);
+  opacity: 0.8;
+}
+.error-title {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0;
+}
+.error-detail {
+  font-size: 0.8125rem;
+  color: var(--text-muted);
+  margin: 0;
+  max-width: 360px;
+  line-height: 1.5;
+}
+.error-cta {
+  margin-top: var(--space-2);
 }
 
 /* Controls overlay */
@@ -961,18 +1039,36 @@ onUnmounted(() => {
   color: rgba(255,255,255,0.5);
 }
 
-/* URL panel */
-.video-url-panel {
-  display: flex;
-  gap: var(--space-3);
-  padding: var(--space-3) var(--space-4);
-  border-top: 1px solid var(--color-glass-border);
-  border-radius: 0 0 var(--radius-lg) var(--radius-lg);
+/* Mobile responsive */
+@media (max-width: 600px) {
+  .controls-buttons {
+    gap: var(--space-1);
+  }
+  .ctrl-btn {
+    width: 32px;
+    height: 32px;
+  }
+  .volume-slider {
+    width: 60px;
+  }
+  .stream-badge { display: none; }
+  .guest-indicator { display: none; }
+  .center-play-btn {
+    width: 56px;
+    height: 56px;
+  }
+  .controls-bar {
+    padding: 0 var(--space-3) var(--space-3);
+  }
+  .progress-thumb {
+    width: 12px;
+    height: 12px;
+  }
 }
-.video-url-panel .input {
-  flex: 1;
-  border-radius: var(--radius-sm);
-  padding: var(--space-2) var(--space-3);
-  font-size: 0.875rem;
+
+@media (max-width: 414px) {
+  .volume-slider {
+    width: 48px;
+  }
 }
 </style>

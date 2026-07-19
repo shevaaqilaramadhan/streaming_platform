@@ -51,6 +51,7 @@ type Participant struct {
 
 type RoomInitPayload struct {
 	RoomID       string        `json:"roomId"`
+	RoomName     string        `json:"roomName,omitempty"`
 	CurrentVideo string        `json:"currentVideo"`
 	CurrentTime  float64       `json:"currentTime"`
 	IsPlaying    bool          `json:"isPlaying"`
@@ -142,4 +143,61 @@ type PublicRoomInfo struct {
 type TogglePublicPayload struct {
 	RoomID   string `json:"roomId"`
 	IsPublic bool   `json:"isPublic"`
+}
+
+type TransferHostPayload struct {
+	RoomID       string `json:"roomId"`
+	TargetUserID string `json:"targetUserId"`
+}
+
+type KickUserPayload struct {
+	RoomID       string `json:"roomId"`
+	TargetUserID string `json:"targetUserId"`
+}
+
+type SetRoomNamePayload struct {
+	RoomID   string `json:"roomId"`
+	RoomName string `json:"roomName"`
+}
+
+type RoomNameChangedPayload struct {
+	RoomID   string `json:"roomId"`
+	RoomName string `json:"roomName"`
+}
+
+type HostChangedPayload struct {
+	RoomID    string `json:"roomId"`
+	NewHostID string `json:"newHostId"`
+	Username  string `json:"username"`
+}
+
+type KickedPayload struct {
+	RoomID string `json:"roomId"`
+	Reason string `json:"reason,omitempty"`
+}
+
+type ScrapeStartedPayload struct {
+	OriginalURL string `json:"originalUrl"`
+	Message     string `json:"message,omitempty"`
+}
+
+type ReactionPayload struct {
+	RoomID string `json:"roomId"`
+	Emoji  string `json:"emoji"`
+}
+
+type ReactionBroadcastPayload struct {
+	RoomID   string `json:"roomId"`
+	UserID   string `json:"userId"`
+	Username string `json:"username"`
+	Emoji    string `json:"emoji"`
+}
+
+type TypingPayload struct {
+	RoomID string `json:"roomId"`
+}
+
+type TypingBroadcastPayload struct {
+	UserID   string `json:"userId"`
+	Username string `json:"username"`
 }

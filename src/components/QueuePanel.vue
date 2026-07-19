@@ -36,8 +36,8 @@
             <path d="M12 8v8"/>
             <path d="M8 12h8"/>
           </svg>
-          <p>Queue is empty</p>
-          <small>Add video URLs below to build a playlist</small>
+          <p class="queue-empty-title">Queue is empty</p>
+          <small>Add video URLs below to build a playlist — they'll play in order automatically</small>
         </div>
 
         <!-- Queue Items -->
@@ -249,9 +249,16 @@ function getDomain(url) {
   font-size: 0.875rem;
 }
 
+.queue-empty-title {
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
 .queue-empty small {
   color: var(--text-muted);
-  opacity: 0.8;
+  opacity: 0.7;
+  max-width: 260px;
+  line-height: 1.4;
 }
 
 /* Queue Item Card */
