@@ -1,11 +1,37 @@
 package services
 
 import (
+	"crypto/subtle"
 	"encoding/json"
 	"log"
 	neturl "net/url"
+	"regexp"
 	"strings"
+	"sync"
+	"sync/atomic"
+	"time"
+	"unicode/utf8"
 	"watchparty-backend/models"
+	"watchparty-backend/utils"
+)
+
+const (
+	maxChatTextLen       = 500
+	maxQueueSize         = 50
+	maxUsernameLen       = 32
+	episodeEndedDebounce = 3 * time.Second
+)
+
+var (
+	lastEpisodeEnded sync.Map // roomID -> *atomic.Int64 (unix nano)
+	usernamePattern  = regexp.MustCompile(`^[a-zA-Z0-9_\- .]+$`)
+	urlSchemePattern = regexp.MustCompile(`^https?://`)
+
+	// Per-user WS action limits (in-memory token buckets).
+	// chat: ~20/min, setVideo/scrape: ~6/min, queue add: ~10/min
+	chatRateLimit     = utils.NewTokenBucket(20.0/60.0, 5)
+	setVideoRateLimit = utils.NewTokenBucket(6.0/60.0, 2)
+	queueRateLimit    = utils.NewTokenBucket(10.0/60.0, 3)
 )
 
 func isYouTubeURL(url string) bool {
@@ -24,6 +50,36 @@ func isDirectStreamURL(url string) bool {
 		strings.HasSuffix(path, ".m3u8") ||
 		strings.HasSuffix(path, ".webm") ||
 		strings.HasSuffix(path, ".mkv")
+}
+
+func isValidMediaURL(raw string) bool {
+	raw = strings.TrimSpace(raw)
+	if raw == "" || len(raw) > 2048 {
+		return false
+	}
+	if !urlSchemePattern.MatchString(raw) {
+		return false
+	}
+	parsed, err := neturl.Parse(raw)
+	if err != nil || parsed.Host == "" {
+		return false
+	}
+	return parsed.Scheme == "http" || parsed.Scheme == "https"
+}
+
+func sanitizeUsername(username string) string {
+	username = strings.TrimSpace(username)
+	if username == "" {
+		return "Anonymous"
+	}
+	if utf8.RuneCountInString(username) > maxUsernameLen {
+		runes := []rune(username)
+		username = string(runes[:maxUsernameLen])
+	}
+	if !usernamePattern.MatchString(username) {
+		return "Anonymous"
+	}
+	return username
 }
 
 func HandleMessage(user *models.User, room *models.WatchRoom, msgBytes []byte) {
@@ -52,6 +108,8 @@ func HandleMessage(user *models.User, room *models.WatchRoom, msgBytes []byte) {
 		handleClearQueue(user, room, msg.Payload)
 	case "EPISODE_ENDED":
 		handleEpisodeEnded(user, room, msg.Payload)
+	case "TOGGLE_PUBLIC":
+		handleTogglePublic(user, room, msg.Payload)
 	default:
 		log.Println("Unknown action:", msg.Action)
 	}
@@ -64,15 +122,38 @@ func handleJoinEvent(user *models.User, room *models.WatchRoom, payloadRaw json.
 		return
 	}
 
-	user.Username = payload.Username
-	user.IsHost = payload.IsHost
+	user.Username = sanitizeUsername(payload.Username)
 
-	// Register the user to the room's clients map so they receive broadcasts and appear in participants list
 	room.Mutex.Lock()
-	room.Clients[user.ID] = user
-	if user.IsHost && room.HostID == "" {
-		room.HostID = user.ID
+	// Idempotent re-JOIN on same connection (frontend may re-send JOIN on reconnect
+	// of the logical session, or spam JOIN). Already in map → refresh state only.
+	alreadyInRoom := false
+	if existing, ok := room.Clients[user.ID]; ok && existing == user {
+		alreadyInRoom = true
 	}
+
+	if !alreadyInRoom {
+		if len(room.Clients) >= MaxUsersPerRoom {
+			room.Mutex.Unlock()
+			log.Printf("Room %s full, rejecting join from %s", room.RoomID, user.Username)
+			rejectMsg := models.Message{
+				Action: "JOIN_REJECTED",
+				Payload: mustMarshalRaw(map[string]interface{}{
+					"roomId": room.RoomID,
+					"reason": "room_full",
+				}),
+			}
+			SendToUser(user, mustMarshal(rejectMsg))
+			return
+		}
+		room.Clients[user.ID] = user
+	}
+
+	room.EmptySince = time.Time{}
+	assignHostOnJoin(user, room, payload.HostToken)
+	isPublic := room.IsPublic
+	hostID := room.HostID
+	isHost := user.IsHost
 	room.Mutex.Unlock()
 
 	currentVideo, currentTime, isPlaying, participants, metadata, queue := GetRoomState(room.RoomID)
@@ -87,67 +168,169 @@ func handleJoinEvent(user *models.User, room *models.WatchRoom, payloadRaw json.
 			Participants: participants,
 			Metadata:     metadata,
 			Queue:        queue,
+			IsPublic:     isPublic,
+			HostID:       hostID,
+			IsHost:       isHost,
 		})),
 	}
 
 	SendToUser(user, mustMarshal(roomInitMsg))
 
-	joinBroadcastMsg := models.Message{
-		Action: "JOIN_EVENT",
-		Payload: json.RawMessage(mustMarshal(models.JoinBroadcastPayload{
-			UserID:   user.ID,
-			Username: user.Username,
-		})),
+	// Only broadcast presence on first successful join for this user ID.
+	if !alreadyInRoom {
+		joinBroadcastMsg := models.Message{
+			Action: "JOIN_EVENT",
+			Payload: json.RawMessage(mustMarshal(models.JoinBroadcastPayload{
+				UserID:   user.ID,
+				Username: user.Username,
+			})),
+		}
+		BroadcastToRoom(room, mustMarshal(joinBroadcastMsg), user)
+	}
+}
+
+// assignHostOnJoin sets host privilege. Caller must hold room.Mutex.
+// Host claim rules (server-authoritative; client isHost is ignored):
+//  1. Already host on this connection → keep
+//  2. Host seat taken → guest
+//  3. HostToken set (POST /api/rooms) → only matching single-use token claims host
+//  4. No token (legacy CreateRoomWithID / empty room after leave) → first joiner is host
+func assignHostOnJoin(user *models.User, room *models.WatchRoom, hostToken string) {
+	if room.HostID != "" {
+		user.IsHost = room.HostID == user.ID
+		return
 	}
 
-	BroadcastToRoom(room, mustMarshal(joinBroadcastMsg), user)
+	if room.HostToken != "" {
+		if hostTokenMatches(hostToken, room.HostToken) {
+			room.HostID = user.ID
+			room.HostToken = ""
+			user.IsHost = true
+			log.Printf("User %s (%s) claimed host via token for room %s", user.Username, user.ID, room.RoomID)
+			return
+		}
+		user.IsHost = false
+		return
+	}
+
+	room.HostID = user.ID
+	user.IsHost = true
+	log.Printf("User %s (%s) assigned as host for room %s", user.Username, user.ID, room.RoomID)
+}
+
+func hostTokenMatches(provided, expected string) bool {
+	if provided == "" || expected == "" {
+		return false
+	}
+	if len(provided) != len(expected) {
+		return false
+	}
+	return subtle.ConstantTimeCompare([]byte(provided), []byte(expected)) == 1
 }
 
 func handleSyncEvent(user *models.User, room *models.WatchRoom, payloadRaw json.RawMessage) {
+	if !user.IsHost {
+		log.Printf("Non-host %s tried to send SYNC_EVENT", user.Username)
+		return
+	}
+
 	var payload models.SyncPayload
 	if err := json.Unmarshal(payloadRaw, &payload); err != nil {
 		log.Println("Invalid SYNC_EVENT payload:", err)
 		return
 	}
 
+	if payload.CurrentTime < 0 {
+		payload.CurrentTime = 0
+	}
+	if payload.CurrentTime > 86400 {
+		payload.CurrentTime = 86400
+	}
+	if payload.Duration < 0 {
+		payload.Duration = 0
+	}
+
 	isPlaying := payload.PlayerState == "PLAYING"
 	UpdateRoomState(room.RoomID, payload.CurrentTime, isPlaying)
 
+	payload.ServerAt = time.Now().UnixMilli()
+
 	msg := models.Message{
 		Action:  "SYNC_EVENT",
-		Payload: payloadRaw,
+		Payload: mustMarshalRaw(payload),
 	}
 
 	BroadcastToRoom(room, mustMarshal(msg), user)
 }
 
 func handleChatEvent(user *models.User, room *models.WatchRoom, payloadRaw json.RawMessage) {
+	if !chatRateLimit.Allow(user.ID) {
+		log.Printf("Chat rate limited for user %s", user.ID)
+		return
+	}
+
 	var payload models.ChatPayload
 	if err := json.Unmarshal(payloadRaw, &payload); err != nil {
 		log.Println("Invalid CHAT_EVENT payload:", err)
 		return
 	}
 
+	text := strings.TrimSpace(payload.Text)
+	if text == "" {
+		return
+	}
+	if utf8.RuneCountInString(text) > maxChatTextLen {
+		runes := []rune(text)
+		text = string(runes[:maxChatTextLen])
+	}
+
+	safe := models.ChatPayload{
+		RoomID:   room.RoomID,
+		UserID:   user.ID,
+		Username: user.Username,
+		Text:     text,
+		SentAt:   time.Now().UnixMilli(),
+	}
+
 	msg := models.Message{
 		Action:  "CHAT_EVENT",
-		Payload: payloadRaw,
+		Payload: mustMarshalRaw(safe),
 	}
 
 	BroadcastToRoom(room, mustMarshal(msg), nil)
 }
 
 func handleSetVideo(user *models.User, room *models.WatchRoom, payloadRaw json.RawMessage) {
+	if !user.IsHost {
+		log.Printf("Non-host %s tried to SET_VIDEO", user.Username)
+		return
+	}
+	if !setVideoRateLimit.Allow(user.ID) {
+		log.Printf("SET_VIDEO rate limited for user %s", user.ID)
+		return
+	}
+
 	var payload models.SetVideoPayload
 	if err := json.Unmarshal(payloadRaw, &payload); err != nil {
 		log.Println("Invalid SET_VIDEO payload:", err)
 		return
 	}
 
+	if !isValidMediaURL(payload.URL) {
+		log.Printf("Invalid SET_VIDEO URL from %s", user.Username)
+		return
+	}
+
+	// Scrape off the readPump goroutine (IDLIX can take 30-90s).
+	go processSetVideo(user, room, payload)
+}
+
+func processSetVideo(user *models.User, room *models.WatchRoom, payload models.SetVideoPayload) {
 	var metadata *models.VideoMetadata
 
 	if !isYouTubeURL(payload.URL) && !isDirectStreamURL(payload.URL) {
 		log.Printf("Scraping anime page: %s", payload.URL)
-		scraped, err := ScrapeStreamURL(payload.URL)
+		scraped, err := ScrapeStreamURLCached(payload.URL)
 		if err != nil {
 			log.Printf("Scrape failed for %s: %v", payload.URL, err)
 			errMsg := models.Message{
@@ -172,7 +355,7 @@ func handleSetVideo(user *models.User, room *models.WatchRoom, payloadRaw json.R
 	SetRoomMetadata(room.RoomID, metadata)
 
 	broadcastPayload := map[string]interface{}{
-		"roomId":   payload.RoomID,
+		"roomId":   room.RoomID,
 		"videoUrl": metadata.VideoURL,
 		"metadata": metadata,
 	}
@@ -184,19 +367,49 @@ func handleSetVideo(user *models.User, room *models.WatchRoom, payloadRaw json.R
 }
 
 func handleAddToQueue(user *models.User, room *models.WatchRoom, payloadRaw json.RawMessage) {
+	if !queueRateLimit.Allow(user.ID) {
+		log.Printf("ADD_TO_QUEUE rate limited for user %s", user.ID)
+		return
+	}
+
 	var payload models.AddToQueuePayload
 	if err := json.Unmarshal(payloadRaw, &payload); err != nil {
 		log.Println("Invalid ADD_TO_QUEUE payload:", err)
 		return
 	}
 
-	queueItem, err := AddToQueue(room.RoomID, payload.URL)
+	if !isValidMediaURL(payload.URL) {
+		log.Printf("Invalid ADD_TO_QUEUE URL from %s", user.Username)
+		return
+	}
+
+	room.Mutex.RLock()
+	qLen := len(room.Queue)
+	room.Mutex.RUnlock()
+	if qLen >= maxQueueSize {
+		log.Printf("Queue full in room %s", room.RoomID)
+		return
+	}
+
+	// Scrape off the readPump goroutine.
+	go processAddToQueue(user, room, payload.URL)
+}
+
+func processAddToQueue(user *models.User, room *models.WatchRoom, pageURL string) {
+	room.Mutex.RLock()
+	qLen := len(room.Queue)
+	room.Mutex.RUnlock()
+	if qLen >= maxQueueSize {
+		return
+	}
+
+	queueItem, err := AddToQueue(room.RoomID, pageURL)
 	if err != nil {
 		log.Printf("Failed to add to queue: %v", err)
 		errMsg := models.Message{
 			Action: "SCRAPE_ERROR",
 			Payload: mustMarshalRaw(models.ScrapeErrorPayload{
-				OriginalURL: payload.URL,
+				OriginalURL: pageURL,
 				Error:       err.Error(),
 			}),
 		}
@@ -251,38 +464,7 @@ func handleSkipToNext(user *models.User, room *models.WatchRoom, payloadRaw json
 		return
 	}
 
-	nextItem, err := SkipToNext(room.RoomID)
-	if err != nil {
-		log.Printf("Failed to skip to next: %v", err)
-		return
-	}
-
-	room.Mutex.Lock()
-	room.CurrentVideo = nextItem.URL
-	room.CurrentMetadata = nextItem
-	room.CurrentTime = 0
-	room.IsPlaying = false
-	room.Mutex.Unlock()
-
-	videoChangedMsg := models.Message{
-		Action: "CURRENT_VIDEO_CHANGED",
-		Payload: mustMarshalRaw(map[string]interface{}{
-			"roomId":   room.RoomID,
-			"videoUrl": nextItem.URL,
-			"metadata": nextItem,
-		}),
-	}
-	BroadcastToRoom(room, mustMarshal(videoChangedMsg), nil)
-
-	queue := GetQueue(room.RoomID)
-	queueMsg := models.Message{
-		Action: "QUEUE_UPDATE",
-		Payload: mustMarshalRaw(models.QueueUpdatePayload{
-			RoomID: room.RoomID,
-			Queue:  queue,
-		}),
-	}
-	BroadcastToRoom(room, mustMarshal(queueMsg), nil)
+	advanceAndBroadcast(user, room)
 }
 
 func handleClearQueue(user *models.User, room *models.WatchRoom, payloadRaw json.RawMessage) {
@@ -307,18 +489,32 @@ func handleClearQueue(user *models.User, room *models.WatchRoom, payloadRaw json
 }
 
 func handleEpisodeEnded(user *models.User, room *models.WatchRoom, payloadRaw json.RawMessage) {
-	nextItem, err := SkipToNext(room.RoomID)
-	if err != nil {
-		log.Printf("Auto-advance failed (queue empty): %v", err)
+	if !user.IsHost {
+		log.Printf("Non-host %s tried to trigger EPISODE_ENDED", user.Username)
 		return
 	}
 
-	room.Mutex.Lock()
-	room.CurrentVideo = nextItem.URL
-	room.CurrentMetadata = nextItem
-	room.CurrentTime = 0
-	room.IsPlaying = false
-	room.Mutex.Unlock()
+	now := time.Now().UnixNano()
+	val, _ := lastEpisodeEnded.LoadOrStore(room.RoomID, &atomic.Int64{})
+	lastPtr := val.(*atomic.Int64)
+	last := lastPtr.Load()
+	if now-last < int64(episodeEndedDebounce) {
+		log.Printf("EPISODE_ENDED debounced for room %s (too soon)", room.RoomID)
+		return
+	}
+	if !lastPtr.CompareAndSwap(last, now) {
+		return
+	}
+
+	advanceAndBroadcast(user, room)
+}
+
+func advanceAndBroadcast(user *models.User, room *models.WatchRoom) {
+	nextItem, err := AdvanceQueue(room.RoomID)
+	if err != nil {
+		log.Printf("Auto-advance failed: %v", err)
+		return
+	}
 
 	videoChangedMsg := models.Message{
 		Action: "CURRENT_VIDEO_CHANGED",
@@ -340,7 +536,38 @@ func handleEpisodeEnded(user *models.User, room *models.WatchRoom, payloadRaw js
 	}
 	BroadcastToRoom(room, mustMarshal(queueMsg), nil)
 
-	log.Printf("Auto-advanced to: %s - %s", nextItem.Title, nextItem.Episode)
+	log.Printf("Advanced to: %s - %s (by host %s)", nextItem.Title, nextItem.Episode, user.Username)
+}
+
+func handleTogglePublic(user *models.User, room *models.WatchRoom, payloadRaw json.RawMessage) {
+	if !user.IsHost {
+		log.Printf("Non-host %s tried to toggle public status", user.Username)
+		return
+	}
+
+	var payload models.TogglePublicPayload
+	if err := json.Unmarshal(payloadRaw, &payload); err != nil {
+		log.Println("Invalid TOGGLE_PUBLIC payload:", err)
+		return
+	}
+
+	room.Mutex.Lock()
+	room.IsPublic = payload.IsPublic
+	room.Mutex.Unlock()
+
+	status := "private"
+	if payload.IsPublic {
+		status = "public"
+	}
+	log.Printf("Room %s set to %s by host %s", room.RoomID, status, user.Username)
+
+	broadcastMsg := models.Message{
+		Action: "TOGGLE_PUBLIC",
+		Payload: mustMarshalRaw(map[string]interface{}{
+			"isPublic": payload.IsPublic,
+		}),
+	}
+	BroadcastToRoom(room, mustMarshal(broadcastMsg), nil)
 }
 
 func extractDomainFromURL(rawURL string) string {
@@ -360,6 +587,19 @@ func mustMarshalRaw(v interface{}) json.RawMessage {
 	return data
 }
 
+func safeSend(ch chan []byte, message []byte, clientID string) {
+	defer func() {
+		if r := recover(); r != nil {
+			log.Printf("Recovered send on closed channel for client %s: %v", clientID, r)
+		}
+	}()
+	select {
+	case ch <- message:
+	default:
+		log.Println("Client send buffer full:", clientID)
+	}
+}
+
 func BroadcastToRoom(room *models.WatchRoom, message []byte, exclude *models.User) {
 	room.Mutex.RLock()
 	defer room.Mutex.RUnlock()
@@ -368,20 +608,15 @@ func BroadcastToRoom(room *models.WatchRoom, message []byte, exclude *models.Use
 		if exclude != nil && client.ID == exclude.ID {
 			continue
 		}
-		select {
-		case client.Send <- message:
-		default:
-			log.Println("Client send buffer full:", client.ID)
-		}
+		safeSend(client.Send, message, client.ID)
 	}
 }
 
 func SendToUser(user *models.User, message []byte) {
-	select {
-	case user.Send <- message:
-	default:
-		log.Println("User send buffer full:", user.ID)
+	if user == nil {
+		return
 	}
+	safeSend(user.Send, message, user.ID)
 }
 
 func mustMarshal(v interface{}) []byte {
@@ -391,4 +626,9 @@ func mustMarshal(v interface{}) []byte {
 		return []byte("{}")
 	}
 	return data
+}
+
+// PruneEpisodeEnded removes debounce state for a deleted room.
+func PruneEpisodeEnded(roomID string) {
+	lastEpisodeEnded.Delete(roomID)
 }

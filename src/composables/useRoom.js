@@ -21,9 +21,11 @@ export const MSG_TYPES = {
   SKIP_TO_NEXT: 'SKIP_TO_NEXT',
   CLEAR_QUEUE: 'CLEAR_QUEUE',
   EPISODE_ENDED: 'EPISODE_ENDED',
+  TOGGLE_PUBLIC: 'TOGGLE_PUBLIC',
+  HOST_CHANGED: 'HOST_CHANGED',
 }
 
-export function useRoom(roomId, nickname, isHost) {
+export function useRoom(roomId, nickname, hostToken = '') {
   const { status, WS_STATUS, connect, disconnect, send, onMessage } = useWebSocket(roomId)
 
   /* ---- Chat State ---- */
@@ -42,25 +44,37 @@ export function useRoom(roomId, nickname, isHost) {
   /* ---- Participants ---- */
   const participants = ref([])
 
+  /* ---- Local user ID (set from ROOM_INIT) ---- */
+  const localUserId = ref('')
+
+  /* ---- Server-authoritative host flag (never trust URL/query) ---- */
+  const isHost = ref(false)
+
   /* ---- Video Metadata ---- */
   const currentMetadata = ref(null)
 
   /* ---- Play Queue ---- */
   const queue = ref([])
 
+  /* ---- Public visibility state ---- */
+  const isPublic = ref(false)
+
   /* ---- Computed ---- */
   const isConnected = computed(() => status.value === WS_STATUS.CONNECTED)
 
-  // Watch status to send JOIN_EVENT when connected
+  // Send JOIN_EVENT every time we connect (including reconnects)
   watch(status, (newStatus) => {
     if (newStatus === WS_STATUS.CONNECTED) {
+      const payload = {
+        roomId,
+        username: nickname,
+      }
+      if (hostToken) {
+        payload.hostToken = hostToken
+      }
       send({
         action: MSG_TYPES.JOIN_EVENT,
-        payload: {
-          roomId,
-          username: nickname,
-          isHost,
-        },
+        payload,
       })
     }
   })
@@ -78,15 +92,56 @@ export function useRoom(roomId, nickname, isHost) {
         if (data.payload?.participants) {
           participants.value = data.payload.participants
         }
-        currentMetadata.value = data.payload.metadata || null
-        queue.value = data.payload.queue || []
+        currentMetadata.value = data.payload?.metadata || null
+        queue.value = data.payload?.queue || []
+        isPublic.value = data.payload?.isPublic || false
+
+        // Server-authoritative host status
+        if (typeof data.payload?.isHost === 'boolean') {
+          isHost.value = data.payload.isHost
+        }
+
+        // Find our userId from the participants list
+        if (data.payload?.participants) {
+          const self = data.payload.participants.find(p => p.username === nickname)
+          if (self) {
+            localUserId.value = self.userId
+            if (data.payload.hostId) {
+              isHost.value = self.userId === data.payload.hostId
+            }
+          }
+        }
+        break
+
+      case MSG_TYPES.HOST_CHANGED:
+        if (data.payload?.newHostId) {
+          const amHost = data.payload.newHostId === localUserId.value
+          isHost.value = amHost
+          messages.value.push({
+            id:     Date.now() + Math.random(),
+            type:   'system',
+            text:   amHost
+              ? 'You are now the host'
+              : `${data.payload.username || 'Someone'} is now the host`,
+            sentAt: Date.now(),
+          })
+        }
+        break
+
+      case MSG_TYPES.TOGGLE_PUBLIC:
+        if (typeof data.payload?.isPublic === 'boolean') {
+          isPublic.value = data.payload.isPublic
+        }
         break
 
       case MSG_TYPES.SYNC_EVENT:
         // Received from Go when another user (the host) changes player state
-        if (!isHost) {
+        if (!isHost.value) {
+          const latency = data.payload.serverAt
+            ? (Date.now() - data.payload.serverAt) / 1000
+            : 0
           playerState.value.isPlaying   = data.payload.playerState === 'PLAYING'
-          playerState.value.currentTime = data.payload.currentTime
+          playerState.value.currentTime = data.payload.currentTime + latency
         }
         break
 
@@ -97,8 +152,11 @@ export function useRoom(roomId, nickname, isHost) {
           username: data.payload.username,
           text:     data.payload.text,
           sentAt:   data.payload.sentAt,
-          isOwn:    data.payload.userId === nickname, // simplistic, backend will confirm
+          isOwn:    data.payload.userId === localUserId.value,
         })
+        if (messages.value.length > 200) {
+          messages.value.splice(0, messages.value.length - 200)
+        }
         break
 
       case MSG_TYPES.JOIN_EVENT:
@@ -181,7 +239,7 @@ export function useRoom(roomId, nickname, isHost) {
   }
 
   function sendSyncEvent({ isPlaying, currentTime }) {
-    if (!isHost) return
+    if (!isHost.value) return
     send({
       action: MSG_TYPES.SYNC_EVENT,
       payload: {
@@ -194,7 +252,7 @@ export function useRoom(roomId, nickname, isHost) {
   }
 
   function setVideo(url) {
-    if (!isHost) return
+    if (!isHost.value) return
     playerState.value.videoUrl = url
     send({
       action: MSG_TYPES.SET_VIDEO,
@@ -203,6 +261,7 @@ export function useRoom(roomId, nickname, isHost) {
   }
 
   function leave() {
+    unregister?.()
     disconnect()
   }
 
@@ -214,7 +273,7 @@ export function useRoom(roomId, nickname, isHost) {
   }
 
   function removeFromQueue(itemId) {
-    if (!isHost) return
+    if (!isHost.value) return
     send({
       action: MSG_TYPES.REMOVE_FROM_QUEUE,
       payload: { roomId, itemId }
@@ -222,7 +281,7 @@ export function useRoom(roomId, nickname, isHost) {
   }
 
   function skipToNext() {
-    if (!isHost) return
+    if (!isHost.value) return
     send({
       action: MSG_TYPES.SKIP_TO_NEXT,
       payload: { roomId }
@@ -230,7 +289,7 @@ export function useRoom(roomId, nickname, isHost) {
   }
 
   function clearQueue() {
-    if (!isHost) return
+    if (!isHost.value) return
     send({
       action: MSG_TYPES.CLEAR_QUEUE,
       payload: { roomId }
@@ -244,6 +303,14 @@ export function useRoom(roomId, nickname, isHost) {
     })
   }
 
+  function togglePublic(isPublicVal) {
+    send({
+      action: MSG_TYPES.TOGGLE_PUBLIC,
+      payload: { roomId, isPublic: isPublicVal }
+    })
+    isPublic.value = isPublicVal
+  }
+
   return {
     status,
     WS_STATUS,
@@ -251,9 +318,12 @@ export function useRoom(roomId, nickname, isHost) {
     messages,
     playerState,
     participants,
+    localUserId,
+    isHost,
     scrapeError,
     currentMetadata,
     queue,
+    isPublic,
     joinRoom,
     leave,
     sendChatMessage,
@@ -264,5 +334,6 @@ export function useRoom(roomId, nickname, isHost) {
     skipToNext,
     clearQueue,
     onVideoEnded,
+    togglePublic,
   }
 }

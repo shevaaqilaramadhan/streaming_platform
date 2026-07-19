@@ -154,7 +154,7 @@ function handleSubmit() {
   font-size: 0.9375rem;
   text-align: center;
   color: var(--text-secondary);
-  margin-top: -var(--space-2);
+  margin-top: calc(-1 * var(--space-2));
 }
 
 .room-chip {
@@ -185,7 +185,7 @@ function handleSubmit() {
   text-align: right;
   font-size: 0.75rem;
   color: var(--text-muted);
-  margin-top: -var(--space-2);
+  margin-top: calc(-1 * var(--space-2));
 }
 .char-count.near-limit { color: var(--color-accent-amber); }
 

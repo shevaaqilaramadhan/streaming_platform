@@ -33,7 +33,6 @@
       class="video-el"
       preload="metadata"
       playsinline
-      crossorigin="anonymous"
       referrerpolicy="no-referrer"
       @timeupdate="onNativeTimeUpdate"
       @play="onNativePlay"
@@ -146,6 +145,8 @@
               min="0" max="1" step="0.05"
               v-model.number="volume"
               @input="onVolumeChange"
+              @pointerdown="isInteracting = true"
+              @pointerup="isInteracting = false"
               aria-label="Volume"
             />
 
@@ -220,6 +221,7 @@
 <script setup>
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import Hls from 'hls.js'
+import { isValidVideoInput } from '../utils/videoInput.js'
 
 const props = defineProps({
   isHost:      { type: Boolean, default: false },
@@ -227,7 +229,7 @@ const props = defineProps({
   playerState: { type: Object,  default: () => ({ isPlaying: false, currentTime: 0 }) },
 })
 
-const emit = defineEmits(['sync', 'set-video', 'ended'])
+const emit = defineEmits(['sync', 'set-video', 'ended', 'error'])
 
 /* ================================================================
    State
@@ -246,6 +248,8 @@ const showPlayPulse = ref(false)
 const newVideoUrl  = ref('')
 const pendingSeekTime = ref(null)
 const videoMode    = ref(null)  // 'youtube' | 'hls' | 'native'
+const streamError  = ref(null)
+const isInteracting = ref(false)
 
 let ytPlayer = null         // YouTube IFrame player instance
 let hlsInstance = null       // hls.js instance
@@ -390,6 +394,14 @@ function stopYtTimePolling() {
 /* ================================================================
    HLS via hls.js
    ================================================================ */
+function getProxiedUrl(url) {
+  if (!url) return url
+  if (url.startsWith('/api/proxy')) return url
+  // Relative URL from hls.js segment — already handled by m3u8 rewriter on backend
+  if (!url.startsWith('http')) return url
+  return `/api/proxy?url=${encodeURIComponent(url)}`
+}
+
 function initHls(url) {
   destroyHls()
   const vid = videoRef.value
@@ -399,12 +411,14 @@ function initHls(url) {
 
   if (Hls.isSupported()) {
     hlsInstance = new Hls({
-      xhrSetup: (xhr) => {
-        // Prevent referrer leaking which causes 403 on some anime CDNs
-        xhr.setRequestHeader && void 0 // no-op; referrerpolicy on <video> handles it
+      xhrSetup: (xhr, url) => {
+        try {
+          const parsed = new URL(url)
+          xhr.setRequestHeader('Referer', parsed.origin + '/')
+        } catch (e) { /* ignore */ }
       }
     })
-    hlsInstance.loadSource(url)
+    hlsInstance.loadSource(getProxiedUrl(url))
     hlsInstance.attachMedia(vid)
     hlsInstance.on(Hls.Events.MANIFEST_PARSED, () => {
       isLoading.value = false
@@ -417,27 +431,36 @@ function initHls(url) {
       }
     })
     hlsInstance.on(Hls.Events.ERROR, (_, data) => {
-      console.error('[HLS] Error:', data)
+      console.error('[HLS] Error:', data.type, data.details, data.fatal)
       if (data.fatal) {
         switch (data.type) {
           case Hls.ErrorTypes.NETWORK_ERROR:
-            console.warn('[HLS] Fatal network error — attempting recovery…')
-            hlsInstance.startLoad()
+            if (data.details === Hls.ErrorDetails.MANIFEST_LOAD_ERROR ||
+                data.details === Hls.ErrorDetails.MANIFEST_LOAD_TIMEOUT) {
+              console.error('[HLS] Cannot load manifest.')
+              streamError.value = 'Failed to load stream. The video source may be unavailable.'
+              emit('error', streamError.value)
+              isLoading.value = false
+            } else {
+              console.warn('[HLS] Attempting network recovery...')
+              hlsInstance.startLoad()
+            }
             break
           case Hls.ErrorTypes.MEDIA_ERROR:
-            console.warn('[HLS] Fatal media error — attempting recovery…')
+            console.warn('[HLS] Attempting media error recovery...')
             hlsInstance.recoverMediaError()
             break
           default:
-            console.error('[HLS] Unrecoverable error, destroying instance')
+            console.error('[HLS] Unrecoverable error')
             destroyHls()
+            isLoading.value = false
             break
         }
       }
     })
   } else if (vid.canPlayType('application/vnd.apple.mpegurl')) {
-    // Safari native HLS support
-    vid.src = url
+    // Safari native HLS support — also route through proxy
+    vid.src = getProxiedUrl(url)
     isLoading.value = false
   } else {
     console.error('[HLS] This browser does not support HLS playback')
@@ -459,7 +482,7 @@ function initNative(url) {
   const vid = videoRef.value
   if (!vid) return
   isLoading.value = true
-  vid.src = url
+  vid.src = getProxiedUrl(url)
   vid.load()
 }
 
@@ -472,9 +495,13 @@ function onNativeTimeUpdate() {
   currentTime.value = vid.currentTime
   duration.value = vid.duration || 0
 
-  if (props.isHost && Date.now() - lastSyncTime > 2000) {
+  if (props.isHost && Date.now() - lastSyncTime > 1000) {
     lastSyncTime = Date.now()
-    if (!vid.paused) emit('sync', { isPlaying: true, currentTime: vid.currentTime })
+    if (!vid.paused) emit('sync', {
+      isPlaying: true,
+      currentTime: vid.currentTime,
+      duration: vid.duration || 0
+    })
   }
 }
 
@@ -533,6 +560,7 @@ function destroyAllPlayers() {
 function loadVideo(url) {
   destroyAllPlayers()
   pendingSeekTime.value = null
+  streamError.value = null
 
   const mode = detectMode(url)
   videoMode.value = mode
@@ -555,39 +583,56 @@ function loadVideo(url) {
 /* ================================================================
    Watch: Incoming player state from WebSocket (guests)
    ================================================================ */
-watch(
-  () => props.playerState,
-  (state) => {
-    if (props.isHost) return
 
+// Watch play state changes
+watch(
+  () => props.playerState.isPlaying,
+  (newPlaying) => {
+    if (props.isHost) return
+    const vid = videoRef.value
+    if (!vid) return
     if (videoMode.value === 'youtube') {
       if (!ytPlayer || typeof ytPlayer.getPlayerState !== 'function') return
       ignoreStateChange = true
       const ytState = ytPlayer.getPlayerState()
-      if (state.isPlaying) { if (ytState !== 1) ytPlayer.playVideo() }
+      if (newPlaying) { if (ytState !== 1) ytPlayer.playVideo() }
       else { if (ytState !== 2) ytPlayer.pauseVideo() }
-      const ytTime = ytPlayer.getCurrentTime()
-      if (Math.abs(ytTime - state.currentTime) > 1.5) {
-        ytPlayer.seekTo(state.currentTime, true)
-        currentTime.value = state.currentTime
-      }
       setTimeout(() => { ignoreStateChange = false }, 200)
     } else {
-      // HLS or Native — both use the same <video> element
-      const vid = videoRef.value
-      if (!vid) return
-      if (Math.abs(vid.currentTime - state.currentTime) > 1) {
-        if (vid.readyState >= 1) {
-          vid.currentTime = state.currentTime
-        } else {
-          pendingSeekTime.value = state.currentTime
+      if (newPlaying && vid.paused) vid.play().catch(() => {})
+      else if (!newPlaying && !vid.paused) vid.pause()
+    }
+  }
+)
+
+// Watch current time changes (debounced seek)
+let seekTimeout = null
+watch(
+  () => props.playerState.currentTime,
+  (newTime) => {
+    if (props.isHost) return
+    clearTimeout(seekTimeout)
+    seekTimeout = setTimeout(() => {
+      if (videoMode.value === 'youtube') {
+        if (!ytPlayer || typeof ytPlayer.getPlayerState !== 'function') return
+        const ytTime = ytPlayer.getCurrentTime()
+        if (Math.abs(ytTime - newTime) > 1.5) {
+          ytPlayer.seekTo(newTime, true)
+          currentTime.value = newTime
+        }
+      } else {
+        const vid = videoRef.value
+        if (!vid) return
+        if (Math.abs(vid.currentTime - newTime) > 1.5) {
+          if (vid.readyState >= 1) {
+            vid.currentTime = newTime
+          } else {
+            pendingSeekTime.value = newTime
+          }
         }
       }
-      if (state.isPlaying && vid.paused) vid.play().catch(() => {})
-      else if (!state.isPlaying && !vid.paused) vid.pause()
-    }
-  },
-  { deep: true }
+    }, 300)
+  }
 )
 
 watch(() => props.videoUrl, (newUrl) => { loadVideo(newUrl) })
@@ -668,13 +713,14 @@ function onMouseMove() {
 
 function hideControlsDelayed() {
   controlsTimer = setTimeout(() => {
-    if (isPlaying.value) showControls.value = false
+    if (isPlaying.value && !isInteracting.value) showControls.value = false
   }, 3000)
 }
 
 function submitVideoUrl() {
   const url = newVideoUrl.value.trim()
   if (!url) return
+  if (!isValidVideoInput(url)) return
   emit('set-video', url)
   newVideoUrl.value = ''
 }
@@ -696,6 +742,7 @@ onMounted(() => {
 onUnmounted(() => {
   destroyAllPlayers()
   clearTimeout(controlsTimer)
+  clearTimeout(seekTimeout)
 })
 </script>
 

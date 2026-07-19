@@ -8,9 +8,9 @@
     </div>
 
     <!-- Navigation bar -->
-    <nav class="home-nav glass">
-      <div class="nav-logo">
-        <svg width="32" height="32" viewBox="0 0 28 28" fill="none">
+    <nav class="home-nav">
+      <router-link to="/" class="nav-logo">
+        <svg width="28" height="28" viewBox="0 0 28 28" fill="none">
           <circle cx="14" cy="14" r="14" fill="url(#nav-logo-grad)"/>
           <polygon points="11,9 21,14 11,19" fill="white"/>
           <defs>
@@ -20,22 +20,50 @@
             </linearGradient>
           </defs>
         </svg>
-        <span class="gradient-text nav-brand">WatchParty</span>
-      </div>
+        <span class="nav-brand">WatchParty</span>
+      </router-link>
       
-      <div class="nav-right">
-        <div class="nav-links">
-          <a href="#docs" class="nav-link">Documentation</a>
-          <a href="#faq" class="nav-link">FAQ</a>
-          <a href="#status" class="nav-link">Server Status</a>
-        </div>
-        <button class="nav-profile-btn" aria-label="Profile">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
-            <circle cx="12" cy="7" r="4"/>
+      <button
+        class="hamburger-btn"
+        aria-label="Toggle navigation menu"
+        :aria-expanded="mobileMenuOpen"
+        @click="mobileMenuOpen = !mobileMenuOpen"
+      >
+        <svg v-if="!mobileMenuOpen" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+          <line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/>
+        </svg>
+        <svg v-else width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+          <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+        </svg>
+      </button>
+      <nav class="nav-links" :class="{ 'nav-links--open': mobileMenuOpen }" aria-label="Main">
+        <router-link to="/docs" class="nav-link" @click="mobileMenuOpen = false">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.704.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2z"/>
+            <path d="M14 2v5a1 1 0 0 0 1 1h5"/>
+            <path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/>
           </svg>
-        </button>
-      </div>
+          Docs
+        </router-link>
+        <router-link to="/faq" class="nav-link" @click="mobileMenuOpen = false">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+          </svg>
+          FAQ
+        </router-link>
+        <router-link to="/status" class="nav-link" @click="mobileMenuOpen = false">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M22 12h-4l-3 9L9 3l-3 9H2"/>
+          </svg>
+          Status
+        </router-link>
+        <a href="https://github.com/litcq/streaming_platform" target="_blank" rel="noopener noreferrer" class="nav-link">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12"/>
+          </svg>
+          GitHub
+        </a>
+      </nav>
     </nav>
 
     <!-- Hero Section -->
@@ -299,10 +327,10 @@
           <div class="footer-col">
             <h4 class="footer-title">Support</h4>
             <ul class="footer-links">
-              <li><a href="#docs" class="footer-link">Documentation</a></li>
-              <li><a href="#faq" class="footer-link">FAQ</a></li>
+              <li><router-link to="/docs" class="footer-link">Documentation</router-link></li>
+              <li><router-link to="/faq" class="footer-link">FAQ</router-link></li>
               <li><a href="https://github.com/litcq/streaming_platform" target="_blank" rel="noopener noreferrer" class="footer-link">GitHub Repository</a></li>
-              <li><a href="#status" class="footer-link">Server Status</a></li>
+              <li><router-link to="/status" class="footer-link">Server Status</router-link></li>
             </ul>
           </div>
 
@@ -329,8 +357,8 @@
         <div class="footer-bottom">
           <p class="copyright">© 2026 WatchParty. All rights reserved.</p>
           <div class="footer-legal">
-            <a href="#privacy" class="footer-link">Privacy Policy</a>
-            <a href="#terms" class="footer-link">Terms of Service</a>
+            <router-link to="/docs" class="footer-link">Privacy Policy</router-link>
+            <router-link to="/faq" class="footer-link">Terms of Service</router-link>
           </div>
         </div>
       </div>
@@ -346,6 +374,7 @@ const router = useRouter()
 const isCreating = ref(false)
 const joinRoomId = ref('')
 const errorMsg   = ref('')
+const mobileMenuOpen = ref(false)
 
 /* ---- Create Room ----
  * Calls the Go backend to generate a unique room ID.
@@ -359,11 +388,16 @@ async function createRoom() {
     const res = await fetch('/api/rooms', { method: 'POST' })
     if (!res.ok) throw new Error('Server error')
     const data = await res.json()
-    router.push({ name: 'room', params: { roomId: data.roomId }, query: { host: 'true' } })
+    if (data.hostToken && typeof sessionStorage !== 'undefined') {
+      sessionStorage.setItem(`wp_host_${data.roomId}`, data.hostToken)
+    }
+    router.push({ name: 'room', params: { roomId: data.roomId } })
   } catch {
-    // Fallback: generate a local room ID so the UI is still explorable
     const roomId = generateLocalId()
-    router.push({ name: 'room', params: { roomId }, query: { host: 'true' } })
+    errorMsg.value = 'Server unavailable — starting a local room. Some features may be limited.'
+    setTimeout(() => {
+      router.push({ name: 'room', params: { roomId } })
+    }, 1500)
   } finally {
     isCreating.value = false
   }
@@ -454,29 +488,64 @@ const features = [
 /* Nav */
 .home-nav {
   display: flex; align-items: center; justify-content: space-between;
-  padding: var(--space-4) var(--space-8);
+  padding: 0 var(--space-8);
+  height: 56px;
   position: sticky; top: 0; z-index: var(--z-overlay);
-  border-radius: 0; border-top: 0; border-left: 0; border-right: 0;
+  background: rgba(10, 11, 16, 0.8);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border-bottom: 1px solid var(--color-glass-border);
 }
 
-.nav-logo { display: flex; align-items: center; gap: var(--space-2); }
-.nav-brand { font-size: 1.2rem; font-weight: 800; letter-spacing: -0.03em; }
+.nav-logo {
+  display: flex; align-items: center; gap: var(--space-2);
+  text-decoration: none;
+}
+.nav-brand {
+  font-size: 1.05rem; font-weight: 700; letter-spacing: -0.02em;
+  color: var(--text-primary);
+}
 
 .nav-links {
   display: flex;
   align-items: center;
-  gap: var(--space-5);
+  gap: var(--space-1);
+}
+
+.hamburger-btn {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  border: 1px solid var(--color-glass-border);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+.hamburger-btn:hover {
+  color: var(--text-primary);
+  background: rgba(255, 255, 255, 0.05);
 }
 
 .nav-link {
-  font-size: 0.9rem;
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 6px 12px;
+  border-radius: var(--radius-sm);
+  font-size: 0.875rem;
   font-weight: 500;
   color: var(--text-secondary);
-  transition: color var(--transition-fast);
+  transition: all var(--transition-fast);
+  text-decoration: none;
 }
 .nav-link:hover {
   color: var(--text-primary);
+  background: rgba(255, 255, 255, 0.05);
 }
+.nav-link svg { opacity: 0.7; }
+.nav-link:hover svg { opacity: 1; }
 
 .nav-right {
   display: flex;
@@ -670,7 +739,7 @@ const features = [
   color: var(--color-accent-red);
   font-size: 0.875rem;
   text-align: left;
-  margin-top: -var(--space-2);
+  margin-top: calc(-1 * var(--space-2));
 }
 
 /* Mock Room Preview */
@@ -1249,6 +1318,8 @@ const features = [
   font-size: 0.9rem;
   color: var(--text-secondary);
   transition: color var(--transition-fast);
+  text-decoration: none;
+  display: inline-block;
 }
 
 .footer-link:hover {
@@ -1381,8 +1452,26 @@ const features = [
 }
 
 @media (max-width: 640px) {
-  .nav-links { display: none; }
-  .home-nav { padding: var(--space-3) var(--space-4); }
+  .hamburger-btn { display: flex; }
+  .nav-links {
+    display: none;
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0;
+    background: rgba(10, 11, 16, 0.95);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border-bottom: 1px solid var(--color-glass-border);
+    padding: var(--space-2) var(--space-4);
+    z-index: var(--z-overlay);
+  }
+  .nav-links--open { display: flex; }
+  .nav-link { padding: var(--space-3) var(--space-2); }
+  .home-nav { padding: var(--space-3) var(--space-4); position: relative; }
   .hero-section {
     min-height: auto;
     padding: var(--space-6) var(--space-4) var(--space-10);

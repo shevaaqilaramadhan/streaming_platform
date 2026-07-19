@@ -38,6 +38,46 @@
           </svg>
           <span>{{ copied ? 'Copied!' : 'Share' }}</span>
         </button>
+
+        <!-- Room Visibility Status / Toggle -->
+        <button
+          v-if="isHost"
+          id="toggle-visibility-btn"
+          class="btn btn-ghost btn-sm visibility-btn"
+          :class="{ 'visibility-btn--public': isPublic }"
+          @click="$emit('toggle-public', !isPublic)"
+          :data-tooltip="isPublic ? 'Make room private' : 'Make room public'"
+          aria-label="Toggle room public visibility"
+        >
+          <svg v-if="isPublic" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="10"/>
+            <line x1="2" y1="12" x2="22" y2="12"/>
+            <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
+          </svg>
+          <svg v-else width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+            <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+          </svg>
+          <span>{{ isPublic ? 'Public' : 'Private' }}</span>
+        </button>
+
+        <span
+          v-else
+          class="room-visibility-badge"
+          :class="{ 'room-visibility-badge--public': isPublic }"
+          :data-tooltip="isPublic ? 'This room is public and appears in the lobby' : 'This room is private and can only be joined via link'"
+        >
+          <svg v-if="isPublic" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="10"/>
+            <line x1="2" y1="12" x2="22" y2="12"/>
+            <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
+          </svg>
+          <svg v-else width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+            <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+          </svg>
+          <span>{{ isPublic ? 'Public' : 'Private' }}</span>
+        </span>
       </div>
     </div>
 
@@ -81,16 +121,21 @@ const props = defineProps({
   isHost:           { type: Boolean, default: false },
   wsStatus:         { type: String, required: true },
   participantCount: { type: Number, default: 1 },
+  isPublic:         { type: Boolean, default: false },
 })
+
+defineEmits(['toggle-public'])
 
 const copied = ref(false)
 
 function copyLink() {
   const url = new URL(window.location.href)
-  url.searchParams.delete('host')
+  url.search = ''
   navigator.clipboard.writeText(url.toString()).then(() => {
     copied.value = true
     setTimeout(() => { copied.value = false }, 2500)
+  }).catch((err) => {
+    console.warn('[RoomHeader] Clipboard write failed:', err)
   })
 }
 </script>
@@ -160,6 +205,34 @@ function copyLink() {
 
 .copy-btn { gap: 4px; }
 .copy-btn--copied { color: var(--color-accent-green) !important; }
+
+.visibility-btn {
+  gap: 4px;
+  color: var(--text-muted);
+}
+.visibility-btn--public {
+  color: var(--color-primary) !important;
+  background: var(--grad-brand-subtle);
+  border-color: hsla(195, 100%, 45%, 0.2);
+}
+
+.room-visibility-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  border-radius: var(--radius-sm);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--color-glass-border);
+}
+.room-visibility-badge--public {
+  color: var(--color-primary);
+  background: var(--grad-brand-subtle);
+  border-color: hsla(195, 100%, 45%, 0.1);
+}
 
 .participant-count {
   display: flex;

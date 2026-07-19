@@ -16,6 +16,8 @@
         :is-host="isHost"
         :ws-status="wsStatus"
         :participant-count="participants.length || 1"
+        :is-public="isPublic"
+        @toggle-public="onTogglePublic"
       />
 
       <!-- Main content -->
@@ -52,6 +54,7 @@
             @sync="onSyncEvent"
             @set-video="onSetVideo"
             @ended="onVideoEnded"
+            @error="onStreamError"
           />
         </section>
 
@@ -144,7 +147,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import RoomHeader   from '../components/RoomHeader.vue'
 import VideoPlayer  from '../components/VideoPlayer.vue'
@@ -154,17 +157,32 @@ import NicknameModal from '../components/NicknameModal.vue'
 import { useRoom } from '../composables/useRoom.js'
 
 const route   = useRoute()
-const roomId  = route.params.roomId
-const isHost  = route.query.host === 'true'
+const roomId  = computed(() => route.params.roomId)
+
+function hostTokenStorageKey(id) {
+  return `wp_host_${id}`
+}
+
+function peekHostToken(id) {
+  if (!id || typeof sessionStorage === 'undefined') return ''
+  return sessionStorage.getItem(hostTokenStorageKey(id)) || ''
+}
+
+function clearHostToken(id) {
+  if (!id || typeof sessionStorage === 'undefined') return
+  sessionStorage.removeItem(hostTokenStorageKey(id))
+}
 
 /* ---- Local State ---- */
-const nickname   = ref(isHost ? 'Host' : '')
-const showModal  = ref(!isHost)
-const hasJoined  = ref(isHost)   // host enters immediately, guest waits for nickname
+const nickname   = ref('')
+const showModal  = ref(true)
+const hasJoined  = ref(false)
+const isHost     = ref(false)
+let pendingHostToken = ''
 
 /* ---- Room composable ---- */
-// We initialize lazily (after nickname is known for guests)
 let room = null
+let roomWatchers = []
 
 const wsStatus        = ref('disconnected')
 const messages        = ref([])
@@ -173,35 +191,54 @@ const participants    = ref([])
 const scrapeError     = ref(null)
 const currentMetadata = ref(null)
 const queue           = ref([])
+const isPublic        = ref(false)
 const activeTab       = ref('chat')
 const isConnected     = computed(() => wsStatus.value === 'connected')
 
 function initRoom() {
-  room = useRoom(roomId, nickname.value, isHost)
-  // Sync reactive refs initially
+  const token = pendingHostToken || peekHostToken(roomId.value)
+  pendingHostToken = ''
+  if (token) clearHostToken(roomId.value)
+  room = useRoom(roomId.value, nickname.value, token)
+
+  // 1. Setup watchers FIRST (before any state changes)
+  roomWatchers.push(
+    watch(room.status,          v => { wsStatus.value    = v }),
+    watch(room.messages,        v => { messages.value    = v }, { deep: true }),
+    watch(room.playerState,     v => { playerState.value = v }, { deep: true }),
+    watch(room.participants,    v => { participants.value = v }, { deep: true }),
+    watch(room.scrapeError,     v => { scrapeError.value  = v }),
+    watch(room.currentMetadata, v => { currentMetadata.value = v }, { deep: true }),
+    watch(room.queue,           v => { queue.value = v }, { deep: true }),
+    watch(room.isPublic,        v => { isPublic.value = v }),
+    watch(room.isHost,          v => { isHost.value = v }),
+  )
+
+  // 2. THEN sync initial values (any changes after this point are caught by watchers)
   wsStatus.value        = room.status.value
   messages.value        = room.messages.value
   playerState.value     = room.playerState.value
   participants.value    = room.participants.value
   currentMetadata.value = room.currentMetadata.value
   queue.value           = room.queue.value
+  isPublic.value        = room.isPublic.value
+  isHost.value          = room.isHost.value
 
-  // Keep local refs in sync with the composable's reactive state
-  watch(room.status,          v => { wsStatus.value    = v })
-  watch(room.messages,        v => { messages.value    = v }, { deep: true })
-  watch(room.playerState,     v => { playerState.value = v }, { deep: true })
-  watch(room.participants,    v => { participants.value = v }, { deep: true })
-  watch(room.scrapeError,     v => { scrapeError.value  = v })
-  watch(room.currentMetadata, v => { currentMetadata.value = v }, { deep: true })
-  watch(room.queue,           v => { queue.value = v }, { deep: true })
-
+  // 3. LAST: connect
   room.joinRoom()
 }
 
 /* ---- Lifecycle ---- */
 onMounted(() => {
-  if (isHost) {
-    initRoom()
+  pendingHostToken = peekHostToken(roomId.value)
+})
+
+onUnmounted(() => {
+  roomWatchers.forEach(stop => stop())
+  roomWatchers = []
+  if (room) {
+    room.leave()
+    room = null
   }
 })
 
@@ -241,8 +278,16 @@ function onClearQueue() {
   room?.clearQueue()
 }
 
+function onTogglePublic(val) {
+  room?.togglePublic(val)
+}
+
 function onVideoEnded() {
   room?.onVideoEnded()
+}
+
+function onStreamError(msg) {
+  console.error('[Stream]', msg)
 }
 </script>
 

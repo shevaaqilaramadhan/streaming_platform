@@ -5,13 +5,14 @@ import (
 	"encoding/hex"
 	"fmt"
 	"log"
+	"time"
 	"watchparty-backend/models"
 )
 
 func generateQueueItemID() string {
 	bytes := make([]byte, 8)
 	if _, err := rand.Read(bytes); err != nil {
-		return fmt.Sprintf("q_%d", len(bytes))
+		return fmt.Sprintf("q_%d", time.Now().UnixNano())
 	}
 	return "q_" + hex.EncodeToString(bytes)
 }
@@ -24,18 +25,31 @@ func AddToQueue(roomID, url string) (*models.QueueItem, error) {
 
 	log.Printf("Adding to queue in room %s: %s", roomID, url)
 
-	metadata, err := ScrapeStreamURL(url)
-	if err != nil {
-		log.Printf("Scrape failed for queue item %s: %v", url, err)
-		return nil, fmt.Errorf("failed to scrape metadata: %w", err)
-	}
+	var queueItem *models.QueueItem
 
-	queueItem := &models.QueueItem{
-		ID:        generateQueueItemID(),
-		URL:       metadata.VideoURL,
-		Title:     metadata.Title,
-		Episode:   metadata.Episode,
-		Thumbnail: metadata.ThumbnailURL,
+	if isDirectStreamURL(url) || isYouTubeURL(url) {
+		// Raw stream/YouTube URL pasted directly — no page to scrape.
+		queueItem = &models.QueueItem{
+			ID:        generateQueueItemID(),
+			URL:       url,
+			Title:     extractDomainFromURL(url),
+			Episode:   "",
+			Thumbnail: "",
+		}
+	} else {
+		metadata, err := ScrapeStreamURLCached(url)
+		if err != nil {
+			log.Printf("Scrape failed for queue item %s: %v", url, err)
+			return nil, fmt.Errorf("failed to scrape metadata: %w", err)
+		}
+
+		queueItem = &models.QueueItem{
+			ID:        generateQueueItemID(),
+			URL:       metadata.VideoURL,
+			Title:     metadata.Title,
+			Episode:   metadata.Episode,
+			Thumbnail: metadata.ThumbnailURL,
+		}
 	}
 
 	room.Mutex.Lock()
@@ -68,6 +82,10 @@ func RemoveFromQueue(roomID, itemID string) error {
 }
 
 func SkipToNext(roomID string) (*models.QueueItem, error) {
+	return AdvanceQueue(roomID)
+}
+
+func AdvanceQueue(roomID string) (*models.QueueItem, error) {
 	room, exists := GetRoom(roomID)
 	if !exists {
 		return nil, fmt.Errorf("room not found")
@@ -83,9 +101,21 @@ func SkipToNext(roomID string) (*models.QueueItem, error) {
 	nextItem := room.Queue[0]
 	room.Queue = room.Queue[1:]
 
-	log.Printf("Skipping to next: %s - %s (ID: %s)", nextItem.Title, nextItem.Episode, nextItem.ID)
+	copied := *nextItem
+	room.CurrentVideo = copied.URL
+	room.CurrentMetadata = &models.QueueItem{
+		ID:        copied.ID,
+		URL:       copied.URL,
+		Title:     copied.Title,
+		Episode:   copied.Episode,
+		Thumbnail: copied.Thumbnail,
+	}
+	room.CurrentTime = 0
+	room.IsPlaying = false
 
-	return nextItem, nil
+	log.Printf("Advancing queue: %s - %s (ID: %s)", copied.Title, copied.Episode, copied.ID)
+
+	return &copied, nil
 }
 
 func ClearQueue(roomID string) error {
@@ -113,7 +143,12 @@ func GetQueue(roomID string) []*models.QueueItem {
 	defer room.Mutex.RUnlock()
 
 	queueCopy := make([]*models.QueueItem, len(room.Queue))
-	copy(queueCopy, room.Queue)
+	for i, item := range room.Queue {
+		if item != nil {
+			copied := *item
+			queueCopy[i] = &copied
+		}
+	}
 
 	return queueCopy
 }

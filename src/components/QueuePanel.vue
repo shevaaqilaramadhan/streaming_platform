@@ -133,6 +133,7 @@
 
 <script setup>
 import { ref } from 'vue'
+import { isValidVideoInput } from '../utils/videoInput.js'
 
 const props = defineProps({
   queue:  { type: Array,   default: () => [] },
@@ -146,6 +147,7 @@ const newVideoUrl = ref('')
 function handleAddToQueue() {
   const url = newVideoUrl.value.trim()
   if (!url) return
+  if (!isValidVideoInput(url)) return
   emit('add', url)
   newVideoUrl.value = ''
 }

@@ -1,0 +1,26 @@
+version: '3.8'
+services:
+  # NanoProxy — SOCKS5 + HTTP forward proxy for bypassing IP blocking
+  nanoproxy:
+    image: ghcr.io/ryanbekhen/nanoproxy:latest
+    container_name: nanoproxy
+    restart: unless-stopped
+    ports:
+      - "1080:1080"   # SOCKS5 proxy
+      - "8180:8080"   # HTTP proxy (mapped to 8180 to avoid conflict with Go backend on :8080)
+    environment:
+      ADDR: ":1080"
+      ADDR_HTTP: ":8080"
+      NO_AUTH_MODE: "true"
+      LOG_LEVEL: "info"
+
+  # Headless Chrome — for headless scraping when Chrome is not installed locally
+  # Access via: http://localhost:9222
+  # Set CHROME_PATH or use chromedp remote allocator to connect
+  headless-chrome:
+    image: chromedp/headless-shell:latest
+    container_name: headless-chrome
+    restart: unless-stopped
+    ports:
+      - "9222:9222"   # Chrome DevTools Protocol
+    shm_size: "2gb"

@@ -3,6 +3,7 @@ package models
 import (
 	"encoding/json"
 	"sync"
+	"time"
 
 	"github.com/gorilla/websocket"
 )
@@ -18,11 +19,16 @@ type User struct {
 type WatchRoom struct {
 	RoomID          string
 	HostID          string
+	HostToken       string // single-use claim secret; never expose over public APIs
 	CurrentVideo    string
 	CurrentTime     float64
 	IsPlaying       bool
 	CurrentMetadata *QueueItem
 	Queue           []*QueueItem
+	IsPublic        bool
+	CreatedAt       time.Time
+	EmptySince      time.Time
+	RoomName        string
 	Clients         map[string]*User
 	Mutex           sync.RWMutex
 }
@@ -33,9 +39,9 @@ type Message struct {
 }
 
 type JoinPayload struct {
-	RoomID   string `json:"roomId"`
-	Username string `json:"username"`
-	IsHost   bool   `json:"isHost"`
+	RoomID    string `json:"roomId"`
+	Username  string `json:"username"`
+	HostToken string `json:"hostToken,omitempty"`
 }
 
 type Participant struct {
@@ -51,13 +57,18 @@ type RoomInitPayload struct {
 	Participants []Participant `json:"participants"`
 	Metadata     *QueueItem    `json:"metadata,omitempty"`
 	Queue        []*QueueItem  `json:"queue,omitempty"`
+	IsPublic     bool          `json:"isPublic"`
+	HostID       string        `json:"hostId,omitempty"`
+	IsHost       bool          `json:"isHost"`
 }
 
 type SyncPayload struct {
 	RoomID      string  `json:"roomId"`
 	PlayerState string  `json:"playerState"`
 	CurrentTime float64 `json:"currentTime"`
+	Duration    float64 `json:"duration"`
 	SentAt      int64   `json:"sentAt"`
+	ServerAt    int64   `json:"serverAt"`
 }
 
 type ChatPayload struct {
@@ -117,4 +128,18 @@ type RemoveFromQueuePayload struct {
 type QueueUpdatePayload struct {
 	RoomID string       `json:"roomId"`
 	Queue  []*QueueItem `json:"queue"`
+}
+
+type PublicRoomInfo struct {
+	RoomID           string     `json:"roomId"`
+	RoomName         string     `json:"roomName"`
+	HostUsername     string     `json:"hostUsername"`
+	ParticipantCount int        `json:"participantCount"`
+	QueueSize        int        `json:"queueSize"`
+	CurrentMetadata  *QueueItem `json:"currentMetadata,omitempty"`
+}
+
+type TogglePublicPayload struct {
+	RoomID   string `json:"roomId"`
+	IsPublic bool   `json:"isPublic"`
 }

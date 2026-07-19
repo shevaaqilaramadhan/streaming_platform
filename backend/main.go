@@ -1,28 +1,67 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"log"
 	"net/http"
+	"os"
+	"os/signal"
+	"syscall"
+	"time"
 	"watchparty-backend/handlers"
 	"watchparty-backend/services"
+	"watchparty-backend/utils"
 )
 
 func main() {
-	http.HandleFunc("/api/rooms", corsMiddleware(handleCreateRoom))
-	http.HandleFunc("/ws/", handlers.HandleWebSocket)
+	mux := http.NewServeMux()
+	mux.HandleFunc("/api/rooms", corsMiddleware(handleCreateRoom))
+	mux.HandleFunc("/api/public-rooms", corsMiddleware(handlers.GetPublicRooms))
+	mux.HandleFunc("/api/proxy", corsMiddleware(handlers.HandleStreamProxy))
+	mux.HandleFunc("/ws/", corsMiddleware(handlers.HandleWebSocket))
 
-	log.Println("🚀 WatchParty server running on :8080")
-	log.Fatal(http.ListenAndServe(":8080", nil))
+	services.StartRoomCleanup(10 * time.Minute)
+
+	addr := ":8080"
+	if v := os.Getenv("LISTEN_ADDR"); v != "" {
+		addr = v
+	}
+
+	srv := &http.Server{
+		Addr:              addr,
+		Handler:           mux,
+		ReadHeaderTimeout: 10 * time.Second,
+		ReadTimeout:       30 * time.Second,
+		WriteTimeout:      120 * time.Second,
+		IdleTimeout:       60 * time.Second,
+	}
+
+	go func() {
+		log.Printf("WatchParty server running on %s", addr)
+		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			log.Fatalf("server error: %v", err)
+		}
+	}()
+
+	stop := make(chan os.Signal, 1)
+	signal.Notify(stop, syscall.SIGINT, syscall.SIGTERM)
+	<-stop
+
+	log.Println("Shutting down...")
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+	if err := srv.Shutdown(ctx); err != nil {
+		log.Printf("graceful shutdown error: %v", err)
+	}
 }
 
-// corsMiddleware allows any localhost origin regardless of port (5173, 5174, etc.)
 func corsMiddleware(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		origin := r.Header.Get("Origin")
-		// Allow any localhost origin for development
-		if origin != "" {
+		if origin != "" && utils.IsOriginAllowed(origin) {
 			w.Header().Set("Access-Control-Allow-Origin", origin)
+			w.Header().Set("Vary", "Origin")
 		}
 		w.Header().Set("Access-Control-Allow-Methods", "POST, GET, OPTIONS")
 		w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
@@ -40,13 +79,19 @@ func handleCreateRoom(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-
-	roomID := services.CreateRoom()
-
-	response := map[string]string{"roomId": roomID}
-	if err := json.NewEncoder(w).Encode(response); err != nil {
+	roomID, hostToken := services.CreateRoom()
+	response := map[string]string{
+		"roomId":    roomID,
+		"hostToken": hostToken,
+	}
+	data, err := json.Marshal(response)
+	if err != nil {
 		log.Println("Failed to encode response:", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if _, err := w.Write(data); err != nil {
+		log.Println("Failed to write response:", err)
 	}
 }
