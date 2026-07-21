@@ -13,8 +13,6 @@ import (
 	"unicode/utf8"
 	"watchparty-backend/models"
 	"watchparty-backend/utils"
-
-	"github.com/gorilla/websocket"
 )
 
 const (
@@ -367,10 +365,31 @@ func processSetVideo(user *models.User, room *models.WatchRoom, payload models.S
 					Error:       err.Error(),
 				}),
 			}
+			// Details to requester; FINISHED to whole room so guests clear scrapeLoading.
 			SendToUser(user, mustMarshal(errMsg))
+			broadcastScrapeFinished(room, payload.URL)
 			return
 		}
-		log.Printf("Scrape succeeded: %s - %s", scraped.Title, scraped.Episode)
+		if scraped == nil || !isPlayableStreamURL(scraped.VideoURL) {
+			vu := ""
+			if scraped != nil {
+				vu = scraped.VideoURL
+			}
+			log.Printf("Scrape produced non-playable URL for %s: %s", payload.URL, vu)
+			InvalidateScrapeCache(payload.URL)
+			errMsg := models.Message{
+				Action: "SCRAPE_ERROR",
+				Payload: mustMarshalRaw(models.ScrapeErrorPayload{
+					OriginalURL: payload.URL,
+					Error:       "Could not resolve a playable stream URL from this page",
+				}),
+			}
+			SendToUser(user, mustMarshal(errMsg))
+			// Always pair STARTED with FINISHED so room-wide loading UI clears.
+			broadcastScrapeFinished(room, payload.URL)
+			return
+		}
+		log.Printf("Scrape succeeded: %s - %s → %s", scraped.Title, scraped.Episode, truncateURL(scraped.VideoURL, 100))
 		metadata = scraped
 		broadcastScrapeFinished(room, payload.URL)
 	} else {
@@ -447,6 +466,10 @@ func processAddToQueue(user *models.User, room *models.WatchRoom, pageURL string
 			}),
 		}
 		SendToUser(user, mustMarshal(errMsg))
+		// Pair STARTED with FINISHED on failure so guests do not stick on loading.
+		if needsScrape {
+			broadcastScrapeFinished(room, pageURL)
+		}
 		return
 	}
 
@@ -722,14 +745,12 @@ func handleKickUser(user *models.User, room *models.WatchRoom, payloadRaw json.R
 
 	// Allow writePump to flush KICKED before TCP close so client can set permanentClose.
 	// Without this delay, onclose races ahead of onmessage → auto-reconnect.
+	// Only Close the conn from this goroutine — never WriteControl/WriteMessage
+	// concurrently with writePump (gorilla websocket is not thread-safe for writes).
+	// Conn.Close alone is safe and causes readPump/writePump to exit.
 	go func() {
-		time.Sleep(500 * time.Millisecond)
+		time.Sleep(400 * time.Millisecond)
 		if conn != nil {
-			_ = conn.WriteControl(
-				websocket.CloseMessage,
-				websocket.FormatCloseMessage(websocket.CloseNormalClosure, "kicked"),
-				time.Now().Add(2*time.Second),
-			)
 			_ = conn.Close()
 		}
 	}()

@@ -192,7 +192,7 @@ const typingDisplay = computed(() => {
   align-items: center;
   justify-content: space-between;
   padding: var(--space-4) var(--space-5);
-  border-bottom: 1px solid var(--color-glass-border);
+  border-bottom: 1px solid var(--color-border);
   flex-shrink: 0;
 }
 .chat-title {
@@ -245,16 +245,16 @@ const typingDisplay = computed(() => {
 }
 
 .message-bubble {
-  background: rgba(255, 255, 255, 0.02);
-  border: 1px solid rgba(255, 255, 255, 0.05);
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.04);
   border-radius: 14px 14px 14px 4px;
   padding: var(--space-2) var(--space-3);
   max-width: 85%;
   transition: all var(--transition-base);
 }
 .message--own .message-bubble {
-  background: var(--grad-brand-subtle);
-  border-color: hsla(195, 100%, 45%, 0.2);
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.08);
   border-radius: 14px 14px 4px 14px;
   align-self: flex-end;
 }
@@ -310,7 +310,7 @@ const typingDisplay = computed(() => {
   width: 6px;
   height: 6px;
   border-radius: 50%;
-  background: var(--color-primary);
+  background: var(--text-muted);
   animation: typing-pulse 1.2s ease-in-out infinite;
 }
 
@@ -329,7 +329,7 @@ const typingDisplay = computed(() => {
   display: flex;
   gap: var(--space-2);
   padding: var(--space-3) var(--space-4);
-  border-top: 1px solid var(--color-glass-border);
+  border-top: 1px solid var(--color-border);
   flex-shrink: 0;
 }
 .chat-input {

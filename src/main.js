@@ -2,12 +2,14 @@ import { createApp } from 'vue'
 import { createRouter, createWebHistory } from 'vue-router'
 import './style.css'
 import App from './App.vue'
+// Eager: first paint / primary UX
 import HomePage from './pages/HomePage.vue'
-import LobbyPage from './pages/LobbyPage.vue'
 import RoomPage from './pages/RoomPage.vue'
-import DocumentationPage from './pages/DocumentationPage.vue'
-import FAQPage from './pages/FAQPage.vue'
-import ServerStatusPage from './pages/ServerStatusPage.vue'
+// Lazy: secondary pages (code-split)
+const LobbyPage = () => import('./pages/LobbyPage.vue')
+const DocumentationPage = () => import('./pages/DocumentationPage.vue')
+const FAQPage = () => import('./pages/FAQPage.vue')
+const ServerStatusPage = () => import('./pages/ServerStatusPage.vue')
 
 const router = createRouter({
   history: createWebHistory(),
@@ -55,4 +57,15 @@ const router = createRouter({
 
 const app = createApp(App)
 app.use(router)
+
+// FE-M01: Global Vue error handler + unhandled promise rejections
+app.config.errorHandler = (err, instance, info) => {
+  console.error('[Vue Error]', err, info)
+}
+if (typeof window !== 'undefined') {
+  window.addEventListener('unhandledrejection', (e) => {
+    console.error('[Unhandled Promise]', e.reason)
+  })
+}
+
 app.mount('#app')

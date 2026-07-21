@@ -13,15 +13,9 @@
         <div class="modal-card glass-strong animate-fade-in-scale">
           <!-- Icon -->
           <div class="modal-icon">
-            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="url(#icon-grad)" stroke-width="1.5">
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" opacity="0.5">
               <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
               <circle cx="12" cy="7" r="4"/>
-              <defs>
-                <linearGradient id="icon-grad" x1="0" y1="0" x2="24" y2="24" gradientUnits="userSpaceOnUse">
-                  <stop offset="0%" stop-color="hsl(195,100%,45%)"/>
-                  <stop offset="100%" stop-color="hsl(215,90%,50%)"/>
-                </linearGradient>
-              </defs>
             </svg>
           </div>
 
@@ -111,9 +105,9 @@ function handleSubmit() {
 .modal-backdrop {
   position: fixed;
   inset: 0;
-  background: rgba(7, 7, 15, 0.75);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
+  background: rgba(4, 4, 5, 0.8);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -123,22 +117,22 @@ function handleSubmit() {
 
 .modal-card {
   width: 100%;
-  max-width: 420px;
+  max-width: 400px;
   border-radius: var(--radius-xl);
   padding: var(--space-10) var(--space-8);
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: var(--space-4);
-  box-shadow: 0 32px 80px rgba(0,0,0,0.6), var(--shadow-glow-sm);
+  box-shadow: 0 24px 60px rgba(0,0,0,0.5);
 }
 
 .modal-icon {
-  width: 64px;
-  height: 64px;
+  width: 56px;
+  height: 56px;
   border-radius: var(--radius-lg);
-  background: var(--grad-brand-subtle);
-  border: 1px solid hsla(330, 100%, 55%, 0.25);
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(255,255,255,0.08);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -146,12 +140,13 @@ function handleSubmit() {
 }
 
 .modal-title {
-  font-size: 1.5rem;
+  font-size: 1.4rem;
   text-align: center;
+  letter-spacing: -0.02em;
 }
 
 .modal-subtitle {
-  font-size: 0.9375rem;
+  font-size: 0.9rem;
   text-align: center;
   color: var(--text-secondary);
   margin-top: calc(-1 * var(--space-2));
@@ -163,10 +158,10 @@ function handleSubmit() {
   gap: 5px;
   padding: 4px 12px;
   border-radius: var(--radius-full);
-  background: rgba(255,255,255,0.05);
-  border: 1px solid var(--color-glass-border);
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.06);
   font-size: 0.8125rem;
-  color: var(--text-secondary);
+  color: var(--text-muted);
 }
 .room-chip strong {
   color: var(--text-primary);

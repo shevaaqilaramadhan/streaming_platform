@@ -28,6 +28,11 @@ const (
 var (
 	roomIDPattern   = regexp.MustCompile(`^[a-zA-Z0-9_-]+$`)
 	usernamePattern = regexp.MustCompile(`^[a-zA-Z0-9_\- .]+$`)
+
+	// BE-L03: per-IP limit on WS upgrades (~30/min, burst 10) to blunt reconnect spam.
+	wsUpgradeRateLimit = utils.NewTokenBucket(30.0/60.0, 10)
+	// BE-L02: per-IP limit on auto CreateRoomWithID via WS (~6/min, burst 3).
+	wsCreateRoomRateLimit = utils.NewTokenBucket(6.0/60.0, 3)
 )
 
 var upgrader = websocket.Upgrader{
@@ -76,8 +81,21 @@ func HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	clientIP := utils.ClientIP(r.RemoteAddr, r.Header.Get("X-Forwarded-For"), r.Header.Get("X-Real-IP"))
+	if !wsUpgradeRateLimit.Allow(clientIP) {
+		log.Printf("WS upgrade rate limited for IP %s", clientIP)
+		http.Error(w, "Too many connections", http.StatusTooManyRequests)
+		return
+	}
+
 	room, exists := services.GetRoom(roomID)
 	if !exists {
+		// Legacy direct-link path: auto-create room. Rate-limit to reduce spam.
+		if !wsCreateRoomRateLimit.Allow(clientIP) {
+			log.Printf("WS CreateRoomWithID rate limited for IP %s room %s", clientIP, roomID)
+			http.Error(w, "Too many room creations", http.StatusTooManyRequests)
+			return
+		}
 		services.CreateRoomWithID(roomID)
 		room, _ = services.GetRoom(roomID)
 	}

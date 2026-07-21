@@ -125,7 +125,7 @@ function getUserColor(username) {
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6), var(--shadow-glow-sm);
+  box-shadow: var(--shadow-card);
 }
 
 /* Header */
@@ -134,7 +134,7 @@ function getUserColor(username) {
   align-items: center;
   justify-content: space-between;
   padding: var(--space-3) var(--space-4);
-  border-bottom: 1px solid var(--color-glass-border);
+  border-bottom: 1px solid var(--color-border);
   flex-shrink: 0;
 }
 
@@ -243,9 +243,9 @@ function getUserColor(username) {
   border-radius: var(--radius-full);
   font-size: 0.65rem;
   font-weight: 700;
-  color: var(--color-primary);
-  background: var(--grad-brand-subtle);
-  border: 1px solid hsla(195, 100%, 45%, 0.2);
+  color: var(--text-primary);
+  background: rgba(255,255,255,0.08);
+  border: 1px solid rgba(255,255,255,0.12);
   flex-shrink: 0;
 }
 
@@ -262,7 +262,7 @@ function getUserColor(username) {
   padding: 0 8px;
   border-radius: var(--radius-sm);
   background: transparent;
-  border: 1px solid var(--color-glass-border);
+  border: 1px solid var(--color-border);
   color: var(--text-muted);
   cursor: pointer;
   display: inline-flex;
@@ -277,20 +277,20 @@ function getUserColor(username) {
   line-height: 1;
 }
 .action-btn:hover {
-  background: var(--color-glass-hover);
-  border-color: var(--color-glass-border);
+  background: var(--color-fill-hover);
+  border-color: var(--color-border);
   color: var(--text-primary);
 }
 
 .action-btn--transfer:hover {
-  color: var(--color-primary);
-  border-color: hsla(195, 100%, 45%, 0.3);
+  color: var(--text-primary);
+  border-color: rgba(255,255,255,0.2);
 }
 
 .action-btn--kick:hover {
   color: var(--color-accent-red);
-  border-color: hsla(0, 75%, 55%, 0.3);
-  background: rgba(239, 68, 68, 0.08);
+  border-color: rgba(217,83,79,0.25);
+  background: rgba(217,83,79,0.06);
 }
 
 /* Mobile */

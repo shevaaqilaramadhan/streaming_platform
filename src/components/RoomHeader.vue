@@ -3,17 +3,11 @@
     <!-- Left: Logo + Room Info -->
     <div class="room-header__left">
       <div class="logo">
-        <svg width="28" height="28" viewBox="0 0 28 28" fill="none">
-          <circle cx="14" cy="14" r="14" fill="url(#logo-grad)"/>
-          <polygon points="11,9 21,14 11,19" fill="white"/>
-          <defs>
-            <linearGradient id="logo-grad" x1="0" y1="0" x2="28" y2="28" gradientUnits="userSpaceOnUse">
-              <stop offset="0%" stop-color="hsl(195,100%,45%)"/>
-              <stop offset="100%" stop-color="hsl(215,90%,50%)"/>
-            </linearGradient>
-          </defs>
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+          <rect x="1" y="1" width="22" height="22" rx="5" stroke="currentColor" stroke-width="1.5"/>
+          <polygon points="10,7 18,12 10,17" fill="currentColor"/>
         </svg>
-        <span class="logo-name gradient-text">WatchParty</span>
+        <span class="logo-name">WatchParty</span>
       </div>
 
       <div class="divider"></div>
@@ -238,15 +232,16 @@ function cancelEditName() {
   gap: var(--space-2);
 }
 .logo-name {
-  font-size: 1.1rem;
-  font-weight: 800;
-  letter-spacing: -0.03em;
+  font-size: 1.05rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--text-primary);
 }
 
 .divider {
   width: 1px;
   height: 20px;
-  background: var(--color-glass-border);
+  background: var(--color-border);
 }
 
 .room-info {
@@ -269,7 +264,7 @@ function cancelEditName() {
   background: rgba(255,255,255,0.06);
   padding: 2px 8px;
   border-radius: var(--radius-sm);
-  border: 1px solid var(--color-glass-border);
+  border: 1px solid var(--color-border);
 }
 
 .copy-btn { gap: 4px; }
@@ -280,9 +275,9 @@ function cancelEditName() {
   color: var(--text-muted);
 }
 .visibility-btn--public {
-  color: var(--color-primary) !important;
-  background: var(--grad-brand-subtle);
-  border-color: hsla(195, 100%, 45%, 0.2);
+  color: var(--text-primary) !important;
+  background: rgba(255,255,255,0.06);
+  border-color: rgba(255,255,255,0.1);
 }
 
 .room-visibility-badge {
@@ -295,12 +290,12 @@ function cancelEditName() {
   font-weight: 600;
   color: var(--text-muted);
   background: rgba(255, 255, 255, 0.03);
-  border: 1px solid var(--color-glass-border);
+  border: 1px solid var(--color-border);
 }
 .room-visibility-badge--public {
-  color: var(--color-primary);
-  background: var(--grad-brand-subtle);
-  border-color: hsla(195, 100%, 45%, 0.1);
+  color: var(--text-primary);
+  background: rgba(255,255,255,0.06);
+  border-color: rgba(255,255,255,0.1);
 }
 
 .participant-count {
@@ -320,7 +315,7 @@ function cancelEditName() {
   font-size: 0.8125rem;
   font-weight: 600;
   background: rgba(255, 255, 255, 0.03);
-  border: 1px solid var(--color-glass-border);
+  border: 1px solid var(--color-border);
   border-radius: var(--radius-full);
   padding: 4px 10px;
   cursor: pointer;
@@ -337,7 +332,7 @@ function cancelEditName() {
 .room-name {
   font-size: 0.875rem;
   font-weight: 700;
-  color: var(--color-primary);
+  color: var(--text-primary);
   cursor: default;
   max-width: 12rem;
   overflow: hidden;
@@ -371,7 +366,7 @@ function cancelEditName() {
   padding: 3px 8px;
   width: 160px;
   outline: none;
-  box-shadow: 0 0 0 3px hsla(195, 100%, 45%, 0.15);
+  box-shadow: 0 0 0 3px rgba(255,255,255,0.04);
 }
 
 @media (max-width: 600px) {

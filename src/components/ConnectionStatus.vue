@@ -57,34 +57,34 @@ const statusLabel = computed(() => {
 
 /* Connected */
 .status--connected {
-  background: rgba(52, 211, 153, 0.12);
-  border-color: rgba(52, 211, 153, 0.3);
-  color: hsl(158, 64%, 62%);
+  background: rgba(92, 184, 92, 0.1);
+  border-color: rgba(92, 184, 92, 0.2);
+  color: hsl(120, 40%, 60%);
 }
 .status--connected .dot {
-  background: hsl(158, 64%, 62%);
+  background: hsl(120, 40%, 60%);
   animation: pulse-glow-green 2s infinite;
 }
 
 /* Connecting / Reconnecting */
 .status--connecting {
-  background: rgba(251, 191, 36, 0.1);
-  border-color: rgba(251, 191, 36, 0.25);
-  color: hsl(38, 95%, 58%);
+  background: rgba(240, 173, 78, 0.08);
+  border-color: rgba(240, 173, 78, 0.15);
+  color: hsl(38, 70%, 60%);
 }
 .status--connecting .dot {
-  background: hsl(38, 95%, 58%);
+  background: hsl(38, 70%, 60%);
   animation: blink 1s step-start infinite;
 }
 
 /* Disconnected */
 .status--disconnected {
-  background: rgba(248, 113, 113, 0.1);
-  border-color: rgba(248, 113, 113, 0.2);
-  color: hsl(0, 75%, 65%);
+  background: rgba(217, 83, 79, 0.08);
+  border-color: rgba(217, 83, 79, 0.15);
+  color: hsl(0, 60%, 65%);
 }
 .status--disconnected .dot {
-  background: hsl(0, 75%, 65%);
+  background: hsl(0, 60%, 65%);
 }
 
 @keyframes pulse-glow-green {

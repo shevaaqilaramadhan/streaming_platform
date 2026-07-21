@@ -37,11 +37,16 @@ var (
 		MaxIdleConns:          100,
 		IdleConnTimeout:       90 * time.Second,
 		TLSHandshakeTimeout:   10 * time.Second,
+		// Header wait only — body stream for progressive MP4 can take minutes
+		ResponseHeaderTimeout: 20 * time.Second,
 		ExpectContinueTimeout: 1 * time.Second,
 	}
 
+	// Timeout MUST be 0 for progressive MP4 (Sokuja ~80–100MB). A 30s overall
+	// timeout aborts mid-stream and leaves the video stuck on "Loading…".
+	// Client disconnect cancels via r.Context(); headers still bounded above.
 	proxyClient = &http.Client{
-		Timeout:   30 * time.Second,
+		Timeout:   0,
 		Transport: proxyTransport,
 		CheckRedirect: func(req *http.Request, via []*http.Request) error {
 			if len(via) >= 10 {
@@ -62,9 +67,12 @@ var (
 		"cloudfront.net", "akamaized.net", "akamaihd.net",
 		"googleusercontent.com", "googlevideo.com", "blogger.com", "blogspot.com",
 		"b-cdn.net", "bunnycdn.com",
+		// Otakudesu / Anoboy HLS CDN (rotating subdomains: *.acek-cdn.com)
+		"acek-cdn.com",
 		"otakudesu.blog", "otakudesu.moe", "otakudesu.cloud",
 		"anoboy.si", "anoboy.vip", "anoboy.live",
 		"samehadaku.care", "samehadaku.win", "samehadaku.day",
+		"sokuja.uk",
 		"animasu.me", "kuronime.vip", "nanime.tv",
 		"idlix.com", "idlix.asia", "idlixku.com", "nontonanimeid.com",
 		"majorplay.net", "ruangskill.space", "pancal.space",
@@ -146,10 +154,13 @@ func HandleStreamProxy(w http.ResponseWriter, r *http.Request) {
 
 	referer := r.URL.Query().Get("referer")
 	if referer == "" {
-		referer = parsed.Scheme + "://" + parsed.Host + "/"
+		// CDN hosts often require the anime-site origin, not the storage host
+		referer = defaultProxyReferer(parsed)
 	}
 	req.Header.Set("Referer", referer)
-	req.Header.Set("Origin", parsed.Scheme+"://"+parsed.Host)
+	if origin := originFromReferer(referer, parsed); origin != "" {
+		req.Header.Set("Origin", origin)
+	}
 
 	if rangeHeader := r.Header.Get("Range"); rangeHeader != "" {
 		req.Header.Set("Range", rangeHeader)
@@ -176,7 +187,11 @@ func HandleStreamProxy(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 	w.Header().Set("Access-Control-Allow-Methods", "GET, OPTIONS")
 	w.Header().Set("Access-Control-Allow-Headers", "Range")
-	w.Header().Set("Access-Control-Expose-Headers", "Content-Range, Content-Length, Content-Type")
+	w.Header().Set("Access-Control-Expose-Headers", "Content-Range, Content-Length, Content-Type, Accept-Ranges")
+	// Help browsers seek progressive MP4 even if upstream omitted the header
+	if w.Header().Get("Accept-Ranges") == "" {
+		w.Header().Set("Accept-Ranges", "bytes")
+	}
 
 	if isM3U8Response(resp, targetURL) {
 		rewriteAndServeM3U8(w, resp, targetURL)
@@ -185,8 +200,44 @@ func HandleStreamProxy(w http.ResponseWriter, r *http.Request) {
 
 	w.WriteHeader(resp.StatusCode)
 	if _, err := io.Copy(w, io.LimitReader(resp.Body, maxProxyStreamBytes)); err != nil {
-		log.Printf("[Proxy] stream copy error for %s: %v", targetURL, err)
+		// Client navigated away / canceled — normal for long progressive streams
+		if r.Context().Err() == nil {
+			log.Printf("[Proxy] stream copy error for %s: %v", targetURL, err)
+		}
 	}
+}
+
+// defaultProxyReferer picks a referer that CDN hosts (Sokuja storages, AceK, etc.) accept.
+func defaultProxyReferer(u *url.URL) string {
+	if u == nil {
+		return ""
+	}
+	host := strings.ToLower(u.Hostname())
+	// storages.sokuja.uk → https://sokuja.uk/
+	if strings.Contains(host, "sokuja") {
+		return "https://sokuja.uk/"
+	}
+	// *.acek-cdn.com is used by otakudesu mirrors
+	if strings.Contains(host, "acek-cdn") {
+		return "https://otakudesu.blog/"
+	}
+	// Blogger / Anoboy progressive streams live on googlevideo.com
+	if strings.Contains(host, "googlevideo") || strings.Contains(host, "googleusercontent") {
+		return "https://www.blogger.com/"
+	}
+	return u.Scheme + "://" + u.Host + "/"
+}
+
+func originFromReferer(referer string, fallback *url.URL) string {
+	if referer != "" {
+		if p, err := url.Parse(referer); err == nil && p.Scheme != "" && p.Host != "" {
+			return p.Scheme + "://" + p.Host
+		}
+	}
+	if fallback != nil {
+		return fallback.Scheme + "://" + fallback.Host
+	}
+	return ""
 }
 
 func isM3U8Response(resp *http.Response, targetURL string) bool {

@@ -40,6 +40,9 @@ func TestValidateProxyURL_AllowsCDN(t *testing.T) {
 		"https://cdn.ruangskill.space/segment.ts",
 		"https://x.pancal.space/video.m3u8",
 		"https://image.tmdb.org/t/p/w500/poster.jpg",
+		"https://yxqc9c2vqj7vepbl.acek-cdn.com/hls2/01/seg.ts",
+		"https://rr2---sn-npoe7ndd.googlevideo.com/videoplayback?id=x",
+		"https://storages.sokuja.uk/2026-summer/file.mp4",
 	}
 	for _, u := range allowed {
 		if err := validateProxyURL(u); err != nil {

@@ -20,12 +20,12 @@ const mouse = {
   radius: 150 // distance to connect to particles
 }
 
-// Particle Config
+// Particle Config — very subtle white
 const config = {
-  particleColor: 'rgba(0, 210, 255, 0.5)', // Clean electric cyan
-  lineColor: 'rgba(0, 210, 255, 0.08)', // Electric cyan lines
-  connectionDistance: 110,
-  maxParticles: 75
+  particleColor: 'rgba(255, 255, 255, 0.2)',
+  lineColor: 'rgba(255, 255, 255, 0.03)',
+  connectionDistance: 90,
+  maxParticles: 50
 }
 
 class Particle {
@@ -56,7 +56,7 @@ class Particle {
   draw() {
     ctx.beginPath()
     ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2)
-    ctx.fillStyle = `rgba(0, 210, 255, ${this.alpha * 0.6})`
+    ctx.fillStyle = `rgba(255, 255, 255, ${this.alpha * 0.25})`
     ctx.fill()
   }
 }
@@ -119,8 +119,8 @@ function animate() {
         ctx.beginPath()
         ctx.moveTo(p1.x, p1.y)
         ctx.lineTo(p2.x, p2.y)
-        ctx.strokeStyle = `rgba(0, 210, 255, ${alpha})`
-        ctx.lineWidth = 0.8
+        ctx.strokeStyle = `rgba(255, 255, 255, ${alpha * 0.4})`
+        ctx.lineWidth = 0.5
         ctx.stroke()
       }
     }
@@ -132,11 +132,11 @@ function animate() {
       const dist = Math.sqrt(dx * dx + dy * dy)
 
       if (dist < mouse.radius) {
-        const alpha = (1 - dist / mouse.radius) * 0.2
+        const alpha = (1 - dist / mouse.radius) * 0.1
         ctx.beginPath()
         ctx.moveTo(p1.x, p1.y)
         ctx.lineTo(mouse.x, mouse.y)
-        ctx.strokeStyle = `rgba(0, 210, 255, ${alpha})`
+        ctx.strokeStyle = `rgba(255, 255, 255, ${alpha})`
         ctx.lineWidth = 1.0
         ctx.stroke()
       }

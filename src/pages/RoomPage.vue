@@ -481,7 +481,7 @@ function onTyping() {
   gap: var(--space-4);
   padding: var(--space-4);
   border-radius: var(--radius-lg);
-  border-left: 3px solid var(--color-primary);
+  border-left: 2px solid rgba(255,255,255,0.2);
   box-shadow: var(--shadow-card);
 }
 
@@ -490,7 +490,7 @@ function onTyping() {
   height: 80px;
   object-fit: cover;
   border-radius: var(--radius-md);
-  border: 1px solid var(--color-glass-border);
+  border: 1px solid var(--color-border);
 }
 
 .metadata-info {
@@ -502,7 +502,7 @@ function onTyping() {
 .watching-label {
   font-size: 0.6875rem;
   font-weight: 700;
-  color: var(--color-primary);
+  color: var(--text-muted);
   letter-spacing: 0.1em;
   text-transform: uppercase;
 }
@@ -539,8 +539,8 @@ function onTyping() {
   display: flex;
   padding: 4px;
   border-radius: var(--radius-md);
-  background: rgba(255, 255, 255, 0.02);
-  border: 1px solid var(--color-glass-border);
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255,255,255,0.05);
   flex-shrink: 0;
 }
 
@@ -568,8 +568,8 @@ function onTyping() {
 
 .tab-btn--active {
   color: var(--text-primary);
-  background: var(--color-glass-hover);
-  border: 1px solid var(--color-glass-border);
+  background: var(--color-fill-hover);
+  border: 1px solid var(--color-border);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
 }
 
@@ -584,8 +584,8 @@ function onTyping() {
 }
 
 .tab-badge--primary {
-  color: white;
-  background: var(--color-primary);
+  color: var(--text-inverse);
+  background: var(--text-primary);
 }
 
 .panel-container {
@@ -608,8 +608,8 @@ function onTyping() {
   border-radius: var(--radius-full);
   font-size: 0.875rem;
   color: var(--color-accent-amber);
-  border-color: hsla(38, 95%, 58%, 0.25) !important;
-  background: rgba(14,14,28,0.9) !important;
+  border-color: rgba(240,173,78,0.2) !important;
+  background: rgba(20,20,22,0.92) !important;
   white-space: nowrap;
   z-index: var(--z-toast);
   box-shadow: var(--shadow-card);
@@ -617,19 +617,19 @@ function onTyping() {
 .banner-spinner {
   width: 14px;
   height: 14px;
-  border: 2px solid rgba(251, 191, 36, 0.2);
+  border: 2px solid rgba(240,173,78,0.15);
   border-top-color: var(--color-accent-amber);
   border-radius: 50%;
   flex-shrink: 0;
   animation: spin-slow 0.7s linear infinite;
 }
 .disconnected-banner--offline {
-  color: hsl(0, 75%, 70%);
-  border-color: hsla(0, 75%, 60%, 0.3) !important;
+  color: var(--color-accent-red);
+  border-color: rgba(217,83,79,0.2) !important;
 }
 .disconnected-banner--offline .banner-spinner {
-  border-color: rgba(248, 113, 113, 0.2);
-  border-top-color: hsl(0, 75%, 65%);
+  border-color: rgba(217,83,79,0.15);
+  border-top-color: var(--color-accent-red);
 }
 
 /* Scrape error toast */
@@ -644,11 +644,11 @@ function onTyping() {
   padding: var(--space-3) var(--space-5);
   border-radius: var(--radius-lg);
   font-size: 0.875rem;
-  color: var(--color-primary);
-  border-color: hsla(330, 100%, 55%, 0.3) !important;
-  background: rgba(14, 14, 28, 0.95) !important;
+  color: var(--text-secondary);
+  border-color: rgba(217,83,79,0.2) !important;
+  background: rgba(20,20,22,0.95) !important;
   z-index: var(--z-toast);
-  box-shadow: var(--shadow-card), 0 0 20px hsla(330, 100%, 55%, 0.15);
+  box-shadow: var(--shadow-card);
   max-width: 500px;
 }
 .scrape-error-text {
@@ -658,7 +658,7 @@ function onTyping() {
 }
 .scrape-error-text strong {
   font-size: 0.8125rem;
-  color: white;
+  color: var(--text-primary);
 }
 .scrape-error-text span {
   font-size: 0.75rem;
@@ -690,16 +690,16 @@ function onTyping() {
   padding: var(--space-3) var(--space-5);
   border-radius: var(--radius-lg);
   font-size: 0.875rem;
-  color: var(--color-primary);
-  border-color: hsla(195, 100%, 45%, 0.3) !important;
-  background: rgba(14, 14, 28, 0.95) !important;
+  color: var(--text-secondary);
+  border-color: rgba(255,255,255,0.08) !important;
+  background: rgba(20,20,22,0.95) !important;
   z-index: var(--z-toast);
-  box-shadow: var(--shadow-card), 0 0 20px hsla(195, 100%, 45%, 0.12);
+  box-shadow: var(--shadow-card);
   white-space: nowrap;
 }
 .scrape-loading-banner .banner-spinner {
-  border-color: hsla(195, 100%, 45%, 0.2);
-  border-top-color: var(--color-primary);
+  border-color: rgba(255,255,255,0.1);
+  border-top-color: var(--text-secondary);
 }
 .scrape-loading-text {
   display: flex;
@@ -708,7 +708,7 @@ function onTyping() {
 }
 .scrape-loading-text strong {
   font-size: 0.8125rem;
-  color: white;
+  color: var(--text-primary);
 }
 .scrape-loading-text span {
   font-size: 0.75rem;

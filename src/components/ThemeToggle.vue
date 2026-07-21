@@ -57,7 +57,7 @@ function applyTheme() {
   flex-shrink: 0;
   border-radius: var(--radius-sm);
   background: transparent;
-  border: 1px solid var(--color-glass-border);
+  border: 1px solid var(--color-border);
   color: var(--text-secondary);
   cursor: pointer;
   display: inline-flex;
@@ -67,7 +67,7 @@ function applyTheme() {
 }
 .theme-toggle:hover {
   color: var(--text-primary);
-  background: var(--color-glass-hover);
+  background: var(--color-fill-hover);
   border-color: rgba(255, 255, 255, 0.12);
 }
 [data-theme="light"] .theme-toggle:hover {

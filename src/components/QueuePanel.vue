@@ -177,7 +177,7 @@ function getDomain(url) {
   align-items: center;
   justify-content: space-between;
   padding: var(--space-4) var(--space-5);
-  border-bottom: 1px solid var(--color-glass-border);
+  border-bottom: 1px solid var(--color-border);
   flex-shrink: 0;
 }
 
@@ -283,12 +283,12 @@ function getDomain(url) {
 }
 
 .queue-item--first .queue-item-card {
-  border-color: hsla(195, 100%, 45%, 0.2);
-  background: var(--grad-brand-subtle);
+  border-color: rgba(255,255,255,0.1);
+  background: rgba(255,255,255,0.04);
 }
 
 .queue-item--first .queue-item-card:hover {
-  background: rgba(0, 210, 255, 0.06);
+  background: rgba(255,255,255,0.06);
 }
 
 /* Thumbnail */
@@ -298,7 +298,7 @@ function getDomain(url) {
   height: 68px;
   border-radius: var(--radius-sm);
   overflow: hidden;
-  border: 1px solid var(--color-glass-border);
+  border: 1px solid var(--color-border);
   background: #000;
   flex-shrink: 0;
   display: flex;
@@ -381,7 +381,7 @@ function getDomain(url) {
 /* Host controls */
 .queue-controls {
   padding: var(--space-3) var(--space-4) 0;
-  border-top: 1px solid var(--color-glass-border);
+  border-top: 1px solid var(--color-border);
   flex-shrink: 0;
 }
 
@@ -401,7 +401,7 @@ function getDomain(url) {
   display: flex;
   gap: var(--space-2);
   padding: var(--space-3) var(--space-4);
-  border-top: 1px solid var(--color-glass-border);
+  border-top: 1px solid var(--color-border);
   flex-shrink: 0;
 }
 

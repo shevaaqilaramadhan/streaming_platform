@@ -1,158 +1,64 @@
 <template>
   <main class="home-page">
-    <!-- Animated background orbs -->
-    <div class="orbs" aria-hidden="true">
-      <div class="orb orb-1"></div>
-      <div class="orb orb-2"></div>
-      <div class="orb orb-3"></div>
-    </div>
-
-    <!-- Navigation bar -->
+    <!-- Navigation -->
     <nav class="home-nav">
       <router-link to="/" class="nav-logo">
-        <svg width="28" height="28" viewBox="0 0 28 28" fill="none">
-          <circle cx="14" cy="14" r="14" fill="url(#nav-logo-grad)"/>
-          <polygon points="11,9 21,14 11,19" fill="white"/>
-          <defs>
-            <linearGradient id="nav-logo-grad" x1="0" y1="0" x2="28" y2="28">
-              <stop offset="0%" stop-color="hsl(195,100%,45%)"/>
-              <stop offset="100%" stop-color="hsl(215,90%,50%)"/>
-            </linearGradient>
-          </defs>
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+          <rect x="1" y="1" width="22" height="22" rx="5" stroke="currentColor" stroke-width="1.5"/>
+          <polygon points="10,7 18,12 10,17" fill="currentColor"/>
         </svg>
-        <span class="nav-brand">WatchParty</span>
+        <span>WatchParty</span>
       </router-link>
-
       <nav class="nav-links" :class="{ 'nav-links--open': mobileMenuOpen }" aria-label="Main">
-        <router-link to="/docs" class="nav-link" @click="mobileMenuOpen = false">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.704.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2z"/>
-            <path d="M14 2v5a1 1 0 0 0 1 1h5"/>
-            <path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/>
-          </svg>
-          Docs
-        </router-link>
-        <router-link to="/faq" class="nav-link" @click="mobileMenuOpen = false">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/>
-          </svg>
-          FAQ
-        </router-link>
-        <router-link to="/status" class="nav-link" @click="mobileMenuOpen = false">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M22 12h-4l-3 9L9 3l-3 9H2"/>
-          </svg>
-          Status
-        </router-link>
-        <a href="https://github.com/litcq/streaming_platform" target="_blank" rel="noopener noreferrer" class="nav-link">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12"/>
-          </svg>
-          GitHub
-        </a>
+        <router-link to="/docs" class="nav-link" @click="mobileMenuOpen = false">Docs</router-link>
+        <router-link to="/faq" class="nav-link" @click="mobileMenuOpen = false">FAQ</router-link>
+        <router-link to="/status" class="nav-link" @click="mobileMenuOpen = false">Status</router-link>
+        <a href="https://github.com/litcq/streaming_platform" target="_blank" rel="noopener noreferrer" class="nav-link">GitHub</a>
       </nav>
-
-      <div class="nav-right-controls">
+      <div class="nav-right">
         <ThemeToggle />
-        <button
-          class="hamburger-btn"
-          aria-label="Toggle navigation menu"
-          :aria-expanded="mobileMenuOpen"
-          @click="mobileMenuOpen = !mobileMenuOpen"
-        >
-          <svg v-if="!mobileMenuOpen" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
-            <line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/>
-          </svg>
-          <svg v-else width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
-            <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
-          </svg>
+        <button class="hamburger-btn" aria-label="Toggle menu" @click="mobileMenuOpen = !mobileMenuOpen">
+          <svg v-if="!mobileMenuOpen" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+          <svg v-else width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
         </button>
       </div>
     </nav>
 
-    <!-- Flash banner (e.g. kicked from room) -->
+    <!-- Flash banner -->
     <Transition name="slide-down">
-      <div v-if="flashMsg" class="flash-banner glass" role="alert">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/>
-        </svg>
+      <div v-if="flashMsg" class="flash-banner" role="alert">
         <span>{{ flashMsg }}</span>
-        <button class="flash-dismiss" type="button" aria-label="Dismiss" @click="flashMsg = ''">&times;</button>
+        <button class="flash-dismiss" @click="flashMsg = ''">&times;</button>
       </div>
     </Transition>
 
-    <!-- Hero Section -->
-    <section class="hero-section" aria-labelledby="hero-heading">
-      <div class="hero-container">
-        <!-- Left Column: Content -->
-        <div class="hero-content animate-fade-in">
-          <h3 class="hero-tagline">
-            <span class="tagline-dot"></span>
-            Live Sync • No account needed
-          </h3>
-
-          <h1 id="hero-heading" class="hero-title">
-            <span class="title-line">Watch Video</span>
-            <span class="title-line">Together,</span>
-            <span class="gradient-text title-line">in sync.</span>
-          </h1>
-
-          <p class="hero-subtitle">
-            Create a room, share the link, and enjoy perfectly synchronized video
-            playback with friends — anywhere in the world.
-          </p>
-
-          <!-- CTA actions -->
+    <!-- Hero -->
+    <section class="hero">
+      <div class="hero-grid">
+        <!-- Left: copy + actions -->
+        <div class="hero-inner">
+          <p class="hero-label">Watch together, perfectly in sync</p>
+          <h1 class="hero-title">The simplest way to<br/>watch videos with friends.</h1>
+          <p class="hero-desc">Create a room, paste a video link, and watch in perfect synchronization with anyone, anywhere. No sign-up, no plugins — just press play.</p>
           <div class="hero-actions">
-            <button
-              id="create-room-btn"
-              class="btn btn-primary btn-lg hero-cta"
-              :class="{ 'is-loading': isCreating }"
-              :disabled="isCreating"
-              @click="createRoom"
-            >
-              <span v-if="isCreating" class="btn-spinner"></span>
-              <svg v-else width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M12 5v14M5 12h14"/>
-              </svg>
-              {{ isCreating ? 'Creating room…' : 'Create Watch Room' }}
+            <button class="btn btn-primary btn-lg" :disabled="isCreating" @click="createRoom">
+              <span v-if="isCreating" class="spinner-sm"></span>
+              <svg v-else width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
+              {{ isCreating ? 'Creating…' : 'Create Room' }}
             </button>
-
-            <span class="actions-divider">or</span>
-
-            <div class="join-group">
-              <input
-                id="join-room-input"
-                v-model="joinRoomId"
-                type="text"
-                class="join-input"
-                placeholder="Room code (e.g. xyz123)"
-                maxlength="20"
-                spellcheck="false"
-                @keydown.enter="joinRoom"
-              />
-              <button
-                id="join-room-submit-btn"
-                type="button"
-                class="btn btn-ghost join-btn"
-                :disabled="!joinRoomId.trim()"
-                @click="joinRoom"
-              >
-                Join
-              </button>
+            <div class="hero-join">
+              <input v-model="joinRoomId" type="text" placeholder="Enter room code" maxlength="20" spellcheck="false" @keydown.enter="joinRoom" />
+              <button class="btn btn-ghost" :disabled="!joinRoomId.trim()" @click="joinRoom">Join</button>
             </div>
           </div>
-
-          <!-- Error message -->
           <Transition name="fade">
-            <p v-if="errorMsg" class="error-msg" role="alert">{{ errorMsg }}</p>
+            <p v-if="errorMsg" class="hero-error" role="alert">{{ errorMsg }}</p>
           </Transition>
         </div>
 
-        <!-- Right Column: Interactive Mock Room Preview -->
-        <div class="hero-preview-wrapper animate-fade-in-scale">
+        <!-- Right: mock room preview (aesthetic mini screen) -->
+        <div class="hero-preview-wrapper animate-fade-in-scale" aria-hidden="true">
           <div class="hero-preview glass">
-            <!-- Browser Header -->
             <div class="preview-header">
               <div class="window-controls">
                 <span class="dot dot-red"></span>
@@ -168,9 +74,7 @@
               </div>
             </div>
 
-            <!-- Browser Content (Mock Room Layout) -->
             <div class="preview-content">
-              <!-- Mock Video Player -->
               <div class="mock-player-col">
                 <div class="mock-now-watching">
                   <div class="mock-thumbnail"></div>
@@ -180,26 +84,23 @@
                   </div>
                   <span class="mock-status-pill">LIVE SYNCED</span>
                 </div>
-                
+
                 <div class="mock-video-area">
-                  <!-- Abstract stylized video thumbnail representation -->
                   <div class="mock-video-poster">
                     <div class="play-trigger-btn">
                       <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
                         <polygon points="5 3 19 12 5 21 5 3"/>
                       </svg>
                     </div>
-                    <!-- Stylized audio waves or visual bars inside poster -->
                     <div class="poster-visuals">
                       <span class="bar bar-1"></span>
                       <span class="bar bar-2"></span>
                       <span class="bar bar-3"></span>
                     </div>
                   </div>
-                  
-                  <!-- Mock Controls -->
+
                   <div class="mock-controls">
-                    <button class="mock-ctrl-btn">
+                    <button class="mock-ctrl-btn" tabindex="-1">
                       <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor">
                         <rect x="6" y="4" width="4" height="16"/>
                         <rect x="14" y="4" width="4" height="16"/>
@@ -209,7 +110,7 @@
                       <div class="mock-timeline-progress" style="width: 65%;"></div>
                     </div>
                     <span class="mock-time">14:20 / 22:05</span>
-                    <button class="mock-ctrl-btn">
+                    <button class="mock-ctrl-btn" tabindex="-1">
                       <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
                         <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/>
                         <path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"/>
@@ -219,7 +120,6 @@
                 </div>
               </div>
 
-              <!-- Mock Chat Panel -->
               <div class="mock-chat-col">
                 <div class="mock-chat-header">
                   <span class="mock-chat-title">Room Chat</span>
@@ -258,8 +158,8 @@
                 </div>
 
                 <div class="mock-chat-input">
-                  <input type="text" placeholder="Type a message..." disabled class="mock-input-field" />
-                  <button class="mock-send-btn" disabled>
+                  <input type="text" placeholder="Type a message..." disabled class="mock-input-field" tabindex="-1" />
+                  <button class="mock-send-btn" disabled tabindex="-1">
                     <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
                       <line x1="22" y1="2" x2="11" y2="13"/>
                       <polygon points="22 2 15 22 11 13 2 9 22 2"/>
@@ -273,108 +173,67 @@
       </div>
     </section>
 
-    <!-- Features section -->
-    <section id="features" class="features-section" aria-labelledby="features-heading">
-      <h2 id="features-heading" class="section-title">Everything you need for the perfect watch party</h2>
-      <div class="features-grid">
-        <article
-          v-for="feat in features"
-          :key="feat.title"
-          class="feature-card glass"
-        >
-          <div class="feature-icon">{{ feat.icon }}</div>
-          <h3>{{ feat.title }}</h3>
-          <p>{{ feat.desc }}</p>
-        </article>
+    <!-- Features -->
+    <section class="features" id="features">
+      <div class="features-inner">
+        <h2 class="section-heading">Everything you need.</h2>
+        <p class="section-sub">No bloat, no complexity — just the essentials for a perfect watch party.</p>
+        <div class="features-grid">
+          <div v-for="f in features" :key="f.title" class="feature-card">
+            <div class="feature-icon">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                <path :d="f.icon"/>
+              </svg>
+            </div>
+            <h3>{{ f.title }}</h3>
+            <p>{{ f.desc }}</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- How it works -->
+    <section class="how">
+      <div class="how-inner">
+        <h2 class="section-heading">Get started in seconds.</h2>
+        <div class="steps">
+          <div v-for="(s, i) in steps" :key="i" class="step">
+            <span class="step-num">{{ String(i + 1).padStart(2, '0') }}</span>
+            <h3>{{ s.title }}</h3>
+            <p>{{ s.desc }}</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- CTA -->
+    <section class="cta-section">
+      <div class="cta-inner">
+        <h2>Ready to watch together?</h2>
+        <p>Create a room in one click and share the link with friends.</p>
+        <button class="btn btn-primary btn-lg" :disabled="isCreating" @click="createRoom">
+          {{ isCreating ? 'Creating…' : 'Get Started' }}
+        </button>
       </div>
     </section>
 
     <!-- Footer -->
     <footer class="home-footer">
-      <div class="footer-container">
-        <div class="footer-grid">
-          <!-- Column 1: Brand -->
-          <div class="footer-col brand-col">
-            <div class="footer-logo">
-              <svg width="32" height="32" viewBox="0 0 28 28" fill="none" aria-hidden="true">
-                <circle cx="14" cy="14" r="14" fill="url(#footer-logo-grad)"/>
-                <polygon points="11,9 21,14 11,19" fill="white"/>
-                <defs>
-                  <linearGradient id="footer-logo-grad" x1="0" y1="0" x2="28" y2="28">
-                    <stop offset="0%" stop-color="hsl(195,100%,45%)"/>
-                    <stop offset="100%" stop-color="hsl(215,90%,50%)"/>
-                  </linearGradient>
-                </defs>
-              </svg>
-              <span class="gradient-text footer-brand">WatchParty</span>
-            </div>
-            <p class="brand-desc">
-              Synchronized video playback with friends anywhere in the world. No sign-up, no plugins, just instant sync.
-            </p>
-            <div class="footer-socials">
-              <a href="https://github.com/litcq" target="_blank" rel="noopener noreferrer" class="social-link" aria-label="GitHub">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                  <path d="M15 22v-4a4.8 4.8 0 0 0-1-3.5c3 0 6-2 6-5.5.08-1.25-.27-2.48-1-3.5.28-1.15.28-2.35 0-3.5 0 0-1 0-3 1.5-2.64-.5-5.36-.5-8 0C6 2 5 2 5 2c-.3 1.15-.3 2.35 0 3.5A5.403 5.403 0 0 0 4 9c0 3.5 3 5.5 6 5.5-.39.49-.68 1.05-.85 1.65-.17.6-.22 1.23-.15 1.85v4"/>
-                  <path d="M9 18c-4.51 2-5-2-7-2"/>
-                </svg>
-              </a>
-              <a href="mailto:support@watchparty.live" class="social-link" aria-label="Email support">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                  <rect width="20" height="16" x="2" y="4" rx="2"/>
-                  <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/>
-                </svg>
-              </a>
-            </div>
+      <div class="footer-inner">
+        <div class="footer-top">
+          <div class="footer-brand">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><rect x="1" y="1" width="22" height="22" rx="5" stroke="currentColor" stroke-width="1.5" opacity="0.4"/><polygon points="10,7 18,12 10,17" fill="currentColor" opacity="0.4"/></svg>
+            <span>WatchParty</span>
           </div>
-
-          <!-- Column 2: Features -->
-          <div class="footer-col">
-            <h4 class="footer-title">Features</h4>
-            <ul class="footer-links">
-              <li><a href="#features" class="footer-link">Real-time Sync</a></li>
-              <li><a href="#features" class="footer-link">Host Controls</a></li>
-              <li><a href="#features" class="footer-link">Live Chat</a></li>
-              <li><a href="#features" class="footer-link">HLS & YouTube Support</a></li>
-            </ul>
-          </div>
-
-          <!-- Column 3: Support -->
-          <div class="footer-col">
-            <h4 class="footer-title">Support</h4>
-            <ul class="footer-links">
-              <li><router-link to="/docs" class="footer-link">Documentation</router-link></li>
-              <li><router-link to="/faq" class="footer-link">FAQ</router-link></li>
-              <li><a href="https://github.com/litcq/streaming_platform" target="_blank" rel="noopener noreferrer" class="footer-link">GitHub Repository</a></li>
-              <li><router-link to="/status" class="footer-link">Server Status</router-link></li>
-            </ul>
-          </div>
-
-          <!-- Column 4: Contact/Developer -->
-          <div class="footer-col">
-            <h4 class="footer-title">Developer</h4>
-            <ul class="footer-details">
-              <li>
-                <span class="detail-label">Email:</span>
-                <a href="mailto:support@watchparty.live" class="detail-value">support@watchparty.live</a>
-              </li>
-              <li>
-                <span class="detail-label">GitHub:</span>
-                <a href="https://github.com/litcq" target="_blank" rel="noopener noreferrer" class="detail-value">@litcq</a>
-              </li>
-              <li class="built-with">
-                <span class="detail-label">Built with:</span>
-                <span class="detail-value">Vite + Vue 3 + Go</span>
-              </li>
-            </ul>
+          <div class="footer-links">
+            <router-link to="/docs">Docs</router-link>
+            <router-link to="/faq">FAQ</router-link>
+            <router-link to="/status">Status</router-link>
+            <a href="https://github.com/litcq/streaming_platform" target="_blank" rel="noopener">GitHub</a>
           </div>
         </div>
-
         <div class="footer-bottom">
-          <p class="copyright">© 2026 WatchParty. All rights reserved.</p>
-          <div class="footer-legal">
-            <router-link to="/docs" class="footer-link">Privacy Policy</router-link>
-            <router-link to="/faq" class="footer-link">Terms of Service</router-link>
-          </div>
+          <p>© 2026 WatchParty. All rights reserved.</p>
         </div>
       </div>
     </footer>
@@ -390,41 +249,29 @@ const router = useRouter()
 const route = useRoute()
 const isCreating = ref(false)
 const joinRoomId = ref('')
-const errorMsg   = ref('')
-const flashMsg   = ref('')
+const errorMsg = ref('')
+const flashMsg = ref('')
 const mobileMenuOpen = ref(false)
 
 onMounted(() => {
-  // Prefer sessionStorage flash (set on kick); fall back to ?kicked=1
   try {
     const raw = sessionStorage.getItem('wp_flash')
     if (raw) {
       sessionStorage.removeItem('wp_flash')
       const data = JSON.parse(raw)
-      if (data?.message) {
-        flashMsg.value = data.message
-      }
+      if (data?.message) flashMsg.value = data.message
     }
-  } catch { /* ignore */ }
+  } catch {}
   if (!flashMsg.value && (route.query.kicked === '1' || route.query.kicked === 'true')) {
-    flashMsg.value = 'You have been removed from the room by the host.'
+    flashMsg.value = 'You have been removed from the room.'
   }
-  if (flashMsg.value && route.query.kicked) {
-    router.replace({ name: 'home', query: {} })
-  }
-  if (flashMsg.value) {
-    setTimeout(() => { flashMsg.value = '' }, 8000)
-  }
+  if (flashMsg.value && route.query.kicked) router.replace({ name: 'home', query: {} })
+  if (flashMsg.value) setTimeout(() => { flashMsg.value = '' }, 8000)
 })
 
-/* ---- Create Room ----
- * Calls the Go backend to generate a unique room ID.
- * If the backend is unavailable, generate a local ID for demo.
- */
 async function createRoom() {
   isCreating.value = true
-  errorMsg.value   = ''
-
+  errorMsg.value = ''
   try {
     const res = await fetch('/api/rooms', { method: 'POST' })
     if (!res.ok) throw new Error('Server error')
@@ -434,11 +281,9 @@ async function createRoom() {
     }
     router.push({ name: 'room', params: { roomId: data.roomId } })
   } catch {
-    const roomId = generateLocalId()
-    errorMsg.value = 'Server unavailable — starting a local room. Some features may be limited.'
-    setTimeout(() => {
-      router.push({ name: 'room', params: { roomId } })
-    }, 1500)
+    const roomId = Math.random().toString(36).slice(2, 8)
+    errorMsg.value = 'Server unavailable — starting a local room.'
+    setTimeout(() => router.push({ name: 'room', params: { roomId } }), 1500)
   } finally {
     isCreating.value = false
   }
@@ -451,152 +296,80 @@ function joinRoom() {
   router.push({ name: 'room', params: { roomId: id } })
 }
 
-function generateLocalId() {
-  return Math.random().toString(36).slice(2, 8)
-}
-
-/* ---- Static content ---- */
 const features = [
-  {
-    icon: '⚡',
-    title: 'Real-time sync',
-    desc: 'Millisecond-precision video sync over WebSockets. Play, pause, and seek stay perfectly in step for everyone.',
-  },
-  {
-    icon: '💬',
-    title: 'Live chat',
-    desc: 'React to every scene together with a built-in chat panel that streams messages instantly to the whole room.',
-  },
-  {
-    icon: '🔒',
-    title: 'Host controls',
-    desc: 'The room creator is the host. Only they control playback — preventing chaotic desyncs from multiple cooks.',
-  },
-  {
-    icon: '🎬',
-    title: 'Any MP4 link',
-    desc: 'Paste any public direct video URL. No plugins, no extensions — just the native HTML5 video element.',
-  },
-  {
-    icon: '👤',
-    title: 'No sign-up',
-    desc: 'Guests just pick a nickname and join. Zero friction, zero account required.',
-  },
-  {
-    icon: '🌐',
-    title: 'Share by link',
-    desc: 'The room URL is the invite. Copy it, share it, and everyone\'s in within seconds.',
-  },
+  { icon: 'M21.5 2v6h-6M2.5 22v-6h6M2.5 11.5a10 10 0 0 1 18.18-4.5M21.5 12.5a10 10 0 0 1-18.18 4.5', title: 'Real-time sync', desc: 'Millisecond-precision synchronization over WebSockets. Play, pause, and seek stay perfectly in step.' },
+  { icon: 'M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z', title: 'Live chat', desc: 'Built-in chat for reacting to scenes together. Messages stream instantly to everyone in the room.' },
+  { icon: 'M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z', title: 'Host controls', desc: 'Only the room creator controls playback — preventing desyncs from conflicting inputs.' },
+  { icon: 'M23 7l-7 5 7 5V7z M1 5h15v14H1z', title: 'Any video source', desc: 'Paste any YouTube, .mp4, or .m3u8 link. Native HTML5 playback with no plugins.' },
+  { icon: 'M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2 M12 3a4 4 0 1 0 0 8 4 4 0 0 0 0-8z', title: 'No sign-up', desc: 'Just pick a nickname and join. Zero friction, zero accounts.' },
+  { icon: 'M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71 M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71', title: 'Share by link', desc: 'The room URL is the invite. Copy it, share it — everyone\'s in within seconds.' },
 ]
 
+const steps = [
+  { title: 'Create a room', desc: 'One click. Your room is ready instantly with a unique code.' },
+  { title: 'Set your name', desc: 'Pick a nickname so others know who you are. No account needed.' },
+  { title: 'Paste a video link', desc: 'YouTube, direct MP4, or any stream URL. The host controls playback.' },
+  { title: 'Invite & watch', desc: 'Share the room link and enjoy in perfect sync with friends.' },
+]
 </script>
 
 <style scoped>
 .home-page {
   min-height: 100vh;
   position: relative;
-  overflow-x: hidden;
-}
-
-.flash-banner {
-  position: sticky;
-  top: 56px;
-  z-index: var(--z-toast);
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  margin: var(--space-3) var(--space-6) 0;
-  padding: var(--space-3) var(--space-4);
-  border-radius: var(--radius-md);
-  color: var(--text-primary);
-  border-color: hsla(0, 75%, 55%, 0.35) !important;
-  background: color-mix(in srgb, var(--color-bg-surface) 92%, transparent) !important;
-  box-shadow: var(--shadow-card);
-  font-size: 0.9rem;
-  font-weight: 500;
-}
-.flash-banner svg {
-  color: var(--color-accent-red);
-  flex-shrink: 0;
-}
-.flash-dismiss {
-  margin-left: auto;
-  background: none;
-  border: none;
-  color: var(--text-muted);
-  font-size: 1.25rem;
-  cursor: pointer;
-  line-height: 1;
-  padding: 0 4px;
-}
-.flash-dismiss:hover { color: var(--text-primary); }
-
-.slide-down-enter-active,
-.slide-down-leave-active {
-  transition: all 0.25s ease;
-}
-.slide-down-enter-from,
-.slide-down-leave-to {
-  opacity: 0;
-  transform: translateY(-12px);
-}
-
-/* Orbs */
-.orbs { position: fixed; inset: 0; pointer-events: none; z-index: 0; overflow: hidden; }
-.orb {
-  position: absolute;
-  border-radius: 50%;
-  filter: blur(80px);
-  opacity: 0.35;
-}
-.orb-1 {
-  width: 600px; height: 600px;
-  background: radial-gradient(circle, hsl(195,100%,45%) 0%, transparent 70%);
-  top: -200px; left: -200px;
-  animation: orb-move-1 18s ease-in-out infinite;
-}
-.orb-2 {
-  width: 500px; height: 500px;
-  background: radial-gradient(circle, hsl(215,90%,50%) 0%, transparent 70%);
-  bottom: -100px; right: -150px;
-  animation: orb-move-2 22s ease-in-out infinite;
-}
-.orb-3 {
-  width: 350px; height: 350px;
-  background: radial-gradient(circle, hsl(205,95%,48%) 0%, transparent 70%);
-  top: 40%; left: 55%;
-  animation: orb-move-1 28s ease-in-out infinite reverse;
-  opacity: 0.2;
 }
 
 /* Nav */
 .home-nav {
-  display: flex; align-items: center; justify-content: space-between;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: var(--nav-height);
   padding: 0 var(--space-8);
-  height: 56px;
-  position: sticky; top: 0; z-index: var(--z-overlay);
-  background: color-mix(in srgb, var(--color-bg-base) 82%, transparent);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border-bottom: 1px solid var(--color-glass-border);
+  position: sticky;
+  top: 0;
+  z-index: var(--z-overlay);
+  background: rgba(10,10,10,0.85);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--color-border);
 }
-
 .nav-logo {
-  display: flex; align-items: center; gap: var(--space-2);
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
   text-decoration: none;
-}
-.nav-brand {
-  font-size: 1.05rem; font-weight: 700; letter-spacing: -0.02em;
   color: var(--text-primary);
+  font-weight: 600;
+  font-size: 0.9375rem;
+  letter-spacing: -0.02em;
 }
-
 .nav-links {
   display: flex;
   align-items: center;
   gap: var(--space-1);
   margin-left: auto;
 }
-
+.nav-link {
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 14px;
+  border-radius: var(--radius-sm);
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+  transition: all var(--transition-fast);
+  text-decoration: none;
+}
+.nav-link:hover {
+  color: var(--text-primary);
+  background: var(--color-fill);
+}
+.nav-right {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
 .hamburger-btn {
   display: none;
   align-items: center;
@@ -605,293 +378,176 @@ const features = [
   height: 36px;
   border-radius: var(--radius-sm);
   background: transparent;
-  border: 1px solid var(--color-glass-border);
+  border: 1px solid var(--color-border);
   color: var(--text-secondary);
   cursor: pointer;
   transition: all var(--transition-fast);
 }
 .hamburger-btn:hover {
   color: var(--text-primary);
-  background: var(--color-glass-hover);
+  background: var(--color-fill);
 }
 
-.nav-link {
-  display: inline-flex; align-items: center; gap: 5px;
-  padding: 6px 12px;
-  border-radius: var(--radius-sm);
+/* Flash */
+.flash-banner {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin: var(--space-3) var(--space-8) 0;
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-md);
+  background: var(--color-bg-elevated);
+  border: 1px solid var(--color-border);
   font-size: 0.875rem;
-  font-weight: 500;
   color: var(--text-secondary);
-  transition: all var(--transition-fast);
-  text-decoration: none;
 }
-.nav-link:hover {
-  color: var(--text-primary);
-  background: var(--color-glass-hover);
-}
-.nav-link svg { opacity: 0.7; }
-.nav-link:hover svg { opacity: 1; }
-
-.nav-right {
-  display: flex;
-  align-items: center;
-  gap: var(--space-6);
-}
-
-.nav-right-controls {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-}
-
-.nav-profile-btn {
-  width: 36px;
-  height: 36px;
-  border-radius: 50%;
-  background: var(--color-glass);
-  border: 1px solid var(--color-glass-border);
-  color: var(--text-secondary);
-  display: flex;
-  align-items: center;
-  justify-content: center;
+.flash-dismiss {
+  margin-left: auto;
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 1.25rem;
   cursor: pointer;
-  transition: all var(--transition-base);
 }
-.nav-profile-btn:hover {
-  background: var(--color-glass-hover);
-  color: var(--text-primary);
-  border-color: rgba(255, 255, 255, 0.15);
-  box-shadow: var(--shadow-glow-sm);
-  transform: translateY(-1px);
-}
+.flash-dismiss:hover { color: var(--text-primary); }
+.slide-down-enter-active, .slide-down-leave-active { transition: all 0.25s ease; }
+.slide-down-enter-from, .slide-down-leave-to { opacity: 0; transform: translateY(-8px); }
 
-/* Hero Section Layout */
-.hero-section {
-  position: relative;
-  z-index: 1;
-  min-height: 90vh;
-  display: flex;
-  align-items: center;
-  padding: var(--space-6) var(--space-6) var(--space-12);
-  max-width: 1360px;
+/* Hero */
+.hero {
+  padding: var(--space-20) var(--space-8) var(--space-16);
+  max-width: var(--max-width);
   margin: 0 auto;
 }
-
-.hero-container {
+.hero-grid {
   display: grid;
-  grid-template-columns: 1.1fr 1fr;
-  gap: 80px;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-12);
   align-items: center;
-  width: 100%;
 }
-
-.hero-content {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  text-align: left;
-  padding-left: var(--space-6);
+.hero-inner {
+  max-width: 560px;
 }
-
-.hero-tagline {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 0.95rem;
-  font-weight: 700;
-  color: var(--color-primary);
+.hero-label {
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--text-muted);
   text-transform: uppercase;
   letter-spacing: 0.1em;
-  margin-bottom: var(--space-4);
+  margin-bottom: var(--space-5);
 }
-.tagline-dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: var(--color-primary);
-  box-shadow: 0 0 10px var(--color-primary);
-  animation: pulse-glow 2s infinite;
-}
-
 .hero-title {
-  font-size: clamp(2.4rem, 4.8vw, 3.8rem);
-  line-height: 1.15;
+  font-size: clamp(2.25rem, 4.5vw, 3.5rem);
+  font-weight: 600;
+  line-height: 1.1;
   letter-spacing: -0.04em;
-  margin-bottom: var(--space-4);
+  margin-bottom: var(--space-6);
+  color: var(--text-primary);
 }
-
-.title-line {
-  display: block;
-}
-
-@media (min-width: 901px) {
-  .title-line {
-    white-space: nowrap;
-  }
-}
-
-.hero-subtitle {
-  font-size: clamp(1.1rem, 2vw, 1.3rem);
+.hero-desc {
+  font-size: clamp(1rem, 1.6vw, 1.125rem);
   color: var(--text-secondary);
+  line-height: 1.7;
+  margin-bottom: var(--space-10);
   max-width: 520px;
-  line-height: 1.6;
-  margin-bottom: var(--space-8);
 }
-
 .hero-actions {
   display: flex;
   align-items: center;
   gap: var(--space-4);
-  width: 100%;
-  max-width: 600px;
+  flex-wrap: wrap;
 }
-
-.hero-cta {
-  flex-shrink: 0;
-  height: 48px;
-}
-
-.actions-divider {
-  font-size: 0.9rem;
-  color: var(--text-muted);
-  font-weight: 500;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  user-select: none;
-}
-
-.join-group {
+.hero-join {
   display: flex;
   align-items: center;
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid var(--color-glass-border);
+  background: var(--color-fill);
+  border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
   padding: 4px;
-  flex: 1;
-  max-width: 320px;
   height: 48px;
   transition: all var(--transition-base);
 }
-
-.join-group:focus-within {
-  border-color: var(--color-primary);
-  background: rgba(255, 255, 255, 0.06);
-  box-shadow: 0 0 0 3px hsla(195, 100%, 45%, 0.15);
+.hero-join:focus-within {
+  border-color: var(--color-border-strong);
 }
-
-.join-input {
+.hero-join input {
   border: none;
   background: transparent;
   padding: 0 var(--space-3);
   font-family: var(--font-sans);
-  font-size: 0.9375rem;
-  flex: 1;
+  font-size: 0.875rem;
   color: var(--text-primary);
   outline: none;
-  width: 100%;
+  width: 180px;
 }
-.join-input::placeholder {
-  color: var(--text-muted);
-}
-
-.join-btn {
-  padding: 0 var(--space-4);
-  font-size: 0.875rem;
-  font-weight: 600;
-  border-radius: var(--radius-sm);
-  background: var(--color-glass);
-  border: 1px solid var(--color-glass-border);
-  color: var(--text-secondary);
+.hero-join input::placeholder { color: var(--text-muted); }
+.hero-join .btn {
   height: 38px;
-  display: inline-flex;
-  align-items: center;
-  cursor: pointer;
-  transition: all var(--transition-base);
 }
-.join-btn:hover:not(:disabled) {
-  background: var(--color-glass-hover);
-  color: var(--text-primary);
-  border-color: rgba(255, 255, 255, 0.15);
+.hero-error {
+  margin-top: var(--space-4);
+  color: var(--color-accent-red);
+  font-size: 0.8125rem;
 }
-.join-btn:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
-}
-
-.btn-spinner {
-  width: 16px; height: 16px;
-  border: 2px solid rgba(255,255,255,0.3);
-  border-top-color: white;
+.spinner-sm {
+  width: 14px;
+  height: 14px;
+  border: 2px solid rgba(0,0,0,0.15);
+  border-top-color: #0a0a0a;
   border-radius: 50%;
   animation: spin-slow 0.7s linear infinite;
 }
 
-.error-msg {
-  color: var(--color-accent-red);
-  font-size: 0.875rem;
-  text-align: left;
-  margin-top: calc(-1 * var(--space-2));
-}
-
-/* Mock Room Preview */
+/* ── Mock Room Preview (mini screen) ── */
 .hero-preview-wrapper {
   position: relative;
   width: 100%;
 }
-
-/* Subtle glow behind preview */
 .hero-preview-wrapper::before {
   content: '';
   position: absolute;
-  inset: -15px;
+  inset: -12px;
   border-radius: var(--radius-xl);
   background: var(--grad-brand);
-  opacity: 0.06;
-  filter: blur(35px);
+  opacity: 0.04;
+  filter: blur(28px);
   pointer-events: none;
   z-index: -1;
 }
-
 .hero-preview {
   border-radius: var(--radius-xl);
-  border: 1px solid var(--color-glass-border);
-  box-shadow: 0 25px 60px rgba(0, 0, 0, 0.6), var(--shadow-glow-sm);
+  border: 1px solid var(--color-border);
+  box-shadow: var(--shadow-lg);
   overflow: hidden;
-  transition: all var(--transition-slow);
-  background: rgba(10, 11, 16, 0.4);
-  animation: float 6s ease-in-out infinite;
+  transition: border-color var(--transition-slow), box-shadow var(--transition-slow);
+  background: var(--color-bg-surface);
+  animation: hero-float 6s ease-in-out infinite;
   width: 100%;
-  max-width: 720px;
 }
-
-@media (min-width: 901px) {
-  .hero-preview {
-    width: 680px;
-  }
-}
-
 .hero-preview:hover {
-  transform: translateY(-4px) scale(1.01);
-  border-color: rgba(255, 255, 255, 0.1);
-  box-shadow: 0 30px 70px rgba(0, 0, 0, 0.75), var(--shadow-glow-primary);
+  border-color: var(--color-border-strong);
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.45);
 }
 
-/* Browser Window Chrome */
+@keyframes hero-float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-6px); }
+}
+
+/* Browser chrome */
 .preview-header {
   display: flex;
   align-items: center;
   padding: var(--space-3) var(--space-4);
-  background: rgba(25, 28, 40, 0.5);
-  border-bottom: 1px solid var(--color-glass-border);
+  background: var(--color-bg-elevated);
+  border-bottom: 1px solid var(--color-border);
   gap: var(--space-4);
 }
-
 .window-controls {
   display: flex;
   gap: 6px;
   flex-shrink: 0;
 }
-
 .dot {
   width: 9px;
   height: 9px;
@@ -903,60 +559,62 @@ const features = [
 
 .address-bar {
   flex: 1;
-  background: rgba(10, 11, 16, 0.6);
+  background: var(--color-bg-base);
   border-radius: var(--radius-sm);
-  border: 1px solid var(--color-glass-border);
+  border: 1px solid var(--color-border);
   font-family: var(--font-mono);
-  font-size: 0.85rem;
+  font-size: 0.75rem;
   color: var(--text-secondary);
   padding: 4px var(--space-3);
   display: flex;
   align-items: center;
   gap: var(--space-2);
-  max-width: 340px;
+  max-width: 320px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 .lock-icon {
   color: var(--color-accent-green);
   opacity: 0.85;
+  flex-shrink: 0;
 }
 
-/* Simulated Interface Content */
+/* Content grid: player + chat */
 .preview-content {
   display: grid;
   grid-template-columns: 1.45fr 1fr;
-  height: 360px;
-  background: rgba(10, 11, 16, 0.2);
+  height: 340px;
+  background: var(--color-bg-base);
 }
 
-/* Mock Player Area */
+/* Player column */
 .mock-player-col {
-  border-right: 1px solid var(--color-glass-border);
+  border-right: 1px solid var(--color-border);
   padding: var(--space-3);
   display: flex;
   flex-direction: column;
   gap: var(--space-3);
-  background: rgba(10, 11, 16, 0.15);
 }
-
 .mock-now-watching {
   display: flex;
   align-items: center;
   gap: var(--space-2);
-  background: rgba(25, 28, 40, 0.3);
-  border: 1px solid rgba(255, 255, 255, 0.03);
+  background: var(--color-fill);
+  border: 1px solid var(--color-border);
   padding: 6px 8px;
   border-radius: var(--radius-md);
-  border-left: 2px solid var(--color-primary);
+  border-left: 2px solid var(--text-primary);
 }
-
 .mock-thumbnail {
-  width: 32px;
-  height: 44px;
-  background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+  width: 28px;
+  height: 40px;
+  background: linear-gradient(135deg, var(--color-bg-elevated) 0%, var(--color-bg-base) 100%);
   border-radius: 4px;
-  border: 1px solid var(--color-glass-border);
+  border: 1px solid var(--color-border);
   position: relative;
   overflow: hidden;
+  flex-shrink: 0;
 }
 .mock-thumbnail::before {
   content: '🎬';
@@ -965,9 +623,8 @@ const features = [
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 0.8rem;
+  font-size: 0.7rem;
 }
-
 .mock-meta-text {
   display: flex;
   flex-direction: column;
@@ -975,85 +632,75 @@ const features = [
   flex: 1;
   min-width: 0;
 }
-
 .mock-meta-label {
-  font-size: 0.7rem;
+  font-size: 0.625rem;
   font-weight: 700;
-  color: var(--color-primary);
-  letter-spacing: 0.05em;
+  color: var(--text-muted);
+  letter-spacing: 0.06em;
 }
-
 .mock-meta-title {
-  font-size: 0.88rem;
-  font-weight: 700;
+  font-size: 0.75rem;
+  font-weight: 600;
   color: var(--text-primary);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
-
 .mock-status-pill {
-  font-size: 0.7rem;
+  font-size: 0.625rem;
   font-weight: 700;
   color: var(--color-accent-green);
-  background: rgba(16, 185, 129, 0.1);
+  background: rgba(74, 222, 128, 0.1);
   padding: 2px 6px;
   border-radius: var(--radius-full);
-  letter-spacing: 0.05em;
+  letter-spacing: 0.04em;
   flex-shrink: 0;
 }
 
 .mock-video-area {
   flex: 1;
-  background: #020205;
+  background: var(--color-bg-base);
   border-radius: var(--radius-md);
   position: relative;
   overflow: hidden;
-  border: 1px solid var(--color-glass-border);
+  border: 1px solid var(--color-border);
   display: flex;
   flex-direction: column;
 }
-
 .mock-video-poster {
   flex: 1;
   display: flex;
   align-items: center;
   justify-content: center;
   position: relative;
-  background: linear-gradient(135deg, rgba(14, 16, 26, 0.9) 0%, rgba(20, 24, 40, 0.95) 100%);
+  background: linear-gradient(135deg, var(--color-bg-base) 0%, var(--color-bg-elevated) 100%);
 }
-
-/* Decorative backdrop representation of a playing video frame */
 .mock-video-poster::before {
   content: '';
   position: absolute;
   inset: 10px;
   border-radius: var(--radius-sm);
-  background: radial-gradient(circle at center, rgba(0, 210, 255, 0.06) 0%, transparent 60%);
+  background: radial-gradient(circle at center, var(--color-fill-hover) 0%, transparent 60%);
   z-index: 1;
 }
-
 .play-trigger-btn {
-  width: 48px;
-  height: 48px;
+  width: 44px;
+  height: 44px;
   border-radius: 50%;
-  background: var(--grad-brand);
-  color: white;
+  background: var(--text-primary);
+  color: var(--text-inverse);
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: var(--shadow-glow-sm);
+  box-shadow: var(--shadow-card);
   position: relative;
   z-index: 2;
   transition: all var(--transition-base);
 }
-
 .hero-preview:hover .play-trigger-btn {
   transform: scale(1.08);
-  box-shadow: var(--shadow-glow-primary);
 }
 
-/* Glowing abstract equalizer-like bars to denote content activity */
 .poster-visuals {
   position: absolute;
   bottom: var(--space-2);
@@ -1063,12 +710,12 @@ const features = [
   gap: 2px;
   height: 12px;
   z-index: 2;
-  opacity: 0.7;
+  opacity: 0.6;
 }
 .poster-visuals .bar {
   width: 2px;
   border-radius: 1px;
-  background: var(--color-primary);
+  background: var(--text-primary);
 }
 .bar-1 { height: 60%; animation: mock-eq 1.2s ease infinite alternate; }
 .bar-2 { height: 100%; animation: mock-eq 0.8s ease infinite alternate 0.2s; }
@@ -1080,16 +727,15 @@ const features = [
 }
 
 .mock-controls {
-  height: 32px;
-  background: rgba(14, 16, 26, 0.95);
-  border-top: 1px solid var(--color-glass-border);
+  height: 30px;
+  background: var(--color-bg-elevated);
+  border-top: 1px solid var(--color-border);
   display: flex;
   align-items: center;
   padding: 0 var(--space-2);
   gap: var(--space-2);
   z-index: 2;
 }
-
 .mock-ctrl-btn {
   background: none;
   border: none;
@@ -1100,63 +746,56 @@ const features = [
   padding: 4px;
   cursor: default;
 }
-
 .mock-timeline {
   flex: 1;
   height: 3px;
-  background: rgba(255, 255, 255, 0.1);
+  background: var(--color-fill-hover);
   border-radius: var(--radius-full);
   overflow: hidden;
-  position: relative;
 }
-
 .mock-timeline-progress {
   height: 100%;
-  background: var(--color-primary);
+  background: var(--text-primary);
   border-radius: var(--radius-full);
 }
-
 .mock-time {
   font-family: var(--font-mono);
-  font-size: 0.75rem;
+  font-size: 0.65rem;
   color: var(--text-muted);
   white-space: nowrap;
 }
 
-/* Mock Chat Area */
+/* Chat column */
 .mock-chat-col {
   padding: var(--space-3);
   display: flex;
   flex-direction: column;
   gap: var(--space-2);
-  background: rgba(25, 28, 40, 0.1);
+  background: var(--color-bg-surface);
 }
-
 .mock-chat-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
   padding-bottom: var(--space-2);
-  border-bottom: 1px solid var(--color-glass-border);
+  border-bottom: 1px solid var(--color-border);
 }
-
 .mock-chat-title {
-  font-size: 0.92rem;
-  font-weight: 700;
+  font-size: 0.8125rem;
+  font-weight: 600;
   color: var(--text-primary);
 }
-
 .mock-active-users {
   display: flex;
   align-items: center;
   gap: 4px;
-  font-size: 0.78rem;
+  font-size: 0.7rem;
   color: var(--text-muted);
 }
 .eye-icon {
   display: flex;
   align-items: center;
-  color: var(--color-primary);
+  color: var(--text-secondary);
 }
 
 .mock-chat-messages {
@@ -1167,27 +806,24 @@ const features = [
   overflow: hidden;
   padding: var(--space-1) 0;
 }
-
 .mock-msg {
   display: flex;
   align-items: flex-end;
   gap: var(--space-2);
-  max-width: 90%;
+  max-width: 92%;
   animation: float-bubble 4s ease-in-out infinite alternate;
 }
-.mock-msg.sender-other {
-  align-self: flex-start;
-}
+.mock-msg.sender-other { align-self: flex-start; }
 .mock-msg.sender-self {
   align-self: flex-end;
-  max-width: 80%;
+  max-width: 85%;
 }
 
 .mock-avatar {
-  width: 24px;
-  height: 24px;
+  width: 22px;
+  height: 22px;
   border-radius: 50%;
-  font-size: 0.75rem;
+  font-size: 0.65rem;
   font-weight: 700;
   display: flex;
   align-items: center;
@@ -1196,44 +832,41 @@ const features = [
   flex-shrink: 0;
   margin-bottom: 2px;
 }
-.avatar-blue { background: hsl(195, 90%, 50%); }
-.avatar-pink { background: hsl(330, 95%, 60%); }
+.avatar-blue { background: #3b82f6; }
+.avatar-pink { background: #ec4899; }
 
 .mock-msg-bubble {
-  background: rgba(25, 28, 40, 0.4);
-  border: 1px solid var(--color-glass-border);
-  padding: 6px 8px;
+  background: var(--color-fill);
+  border: 1px solid var(--color-border);
+  padding: 5px 8px;
   border-radius: 10px 10px 10px 3px;
   display: flex;
   flex-direction: column;
   gap: 1px;
 }
-
 .sender-self .mock-msg-bubble {
   background: var(--grad-brand-subtle);
-  border-color: rgba(0, 210, 255, 0.15);
+  border-color: var(--color-border-strong);
   border-radius: 10px 10px 3px 10px;
 }
-
 .mock-msg-user {
-  font-size: 0.72rem;
+  font-size: 0.65rem;
   font-weight: 700;
   color: var(--text-muted);
 }
 .sender-self .mock-msg-user {
-  color: var(--color-primary);
-}
-
-.mock-msg-text {
-  font-size: 0.85rem;
-  line-height: 1.3;
   color: var(--text-secondary);
+}
+.mock-msg-text {
+  font-size: 0.75rem;
+  line-height: 1.35;
+  color: var(--text-secondary);
+  margin: 0;
 }
 .sender-self .mock-msg-text {
   color: var(--text-primary);
 }
 
-/* Subtle float bubbles animations to look alive */
 @keyframes float-bubble {
   0% { transform: translateY(0); }
   100% { transform: translateY(-3px); }
@@ -1244,21 +877,20 @@ const features = [
   gap: var(--space-2);
   margin-top: auto;
 }
-
 .mock-input-field {
   flex: 1;
-  background: rgba(0, 0, 0, 0.2);
-  border: 1px solid var(--color-glass-border);
+  background: var(--color-bg-base);
+  border: 1px solid var(--color-border);
   border-radius: var(--radius-sm);
   padding: 4px var(--space-2);
-  font-size: 0.85rem;
+  font-size: 0.75rem;
   color: var(--text-muted);
   cursor: default;
+  font-family: var(--font-sans);
 }
-
 .mock-send-btn {
-  background: var(--color-glass);
-  border: 1px solid var(--color-glass-border);
+  background: var(--color-fill);
+  border: 1px solid var(--color-border);
   color: var(--text-muted);
   width: 28px;
   height: 28px;
@@ -1270,278 +902,190 @@ const features = [
 }
 
 /* Features */
-.features-section {
-  position: relative; z-index: 1;
-  padding: var(--space-16) var(--space-6);
-  max-width: 1100px; margin: 0 auto;
+.features {
+  padding: var(--space-20) var(--space-8);
+  border-top: 1px solid var(--color-border);
 }
-
-.section-title {
-  font-size: clamp(1.5rem, 3vw, 2.2rem);
-  text-align: center;
-  margin-bottom: var(--space-10);
+.features-inner {
+  max-width: var(--max-width);
+  margin: 0 auto;
+}
+.section-heading {
+  font-size: clamp(1.5rem, 3vw, 2.25rem);
   letter-spacing: -0.03em;
+  margin-bottom: var(--space-3);
 }
-
+.section-sub {
+  font-size: 1rem;
+  color: var(--text-secondary);
+  margin-bottom: var(--space-12);
+  max-width: 480px;
+}
 .features-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-  gap: var(--space-5);
-}
-
-.feature-card {
-  padding: var(--space-6);
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1px;
+  background: var(--color-border);
+  border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
-  display: flex; flex-direction: column; gap: var(--space-3);
-  transition: all var(--transition-base);
+  overflow: hidden;
 }
-.feature-card:hover {
-  background: var(--color-glass-hover);
-  border-color: rgba(255,255,255,0.12);
-  transform: translateY(-2px);
-  box-shadow: var(--shadow-card);
-}
-
-.feature-icon { font-size: 2rem; }
-
-.feature-card h3 {
-  font-size: 1rem; font-weight: 700; color: var(--text-primary);
-}
-.feature-card p { font-size: 0.9rem; color: var(--text-secondary); line-height: 1.6; }
-
-/* Footer */
-.home-footer {
-  position: relative;
-  z-index: 1;
-  border-top: 1px solid var(--color-glass-border);
-  background: linear-gradient(180deg, transparent 0%, rgba(10, 11, 16, 0.5) 100%);
-  padding: var(--space-12) 0 var(--space-8);
-  margin-top: var(--space-16);
-}
-
-.footer-container {
-  max-width: 1200px;
-  margin: 0 auto;
-  padding: 0 var(--space-6);
-}
-
-.footer-grid {
-  display: grid;
-  grid-template-columns: 2fr 1fr 1fr 1.5fr;
-  gap: var(--space-10);
-  margin-bottom: var(--space-12);
-}
-
-.footer-col {
+.feature-card {
+  background: var(--color-bg-base);
+  padding: var(--space-8);
   display: flex;
   flex-direction: column;
-  gap: var(--space-4);
-  text-align: left;
+  gap: var(--space-3);
+  transition: background var(--transition-base);
 }
-
-.brand-col {
-  padding-right: var(--space-8);
+.feature-card:hover {
+  background: var(--color-bg-surface);
 }
-
-.footer-logo {
+.feature-icon {
+  width: 36px;
+  height: 36px;
   display: flex;
   align-items: center;
-  gap: var(--space-2);
+  justify-content: center;
+  border-radius: var(--radius-md);
+  background: var(--color-fill);
+  border: 1px solid var(--color-border);
+  color: var(--text-secondary);
 }
-
-.footer-brand {
-  font-size: 1.25rem;
-  font-weight: 800;
-  letter-spacing: -0.02em;
+.feature-card h3 {
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: var(--text-primary);
 }
-
-.brand-desc {
-  font-size: 0.9rem;
+.feature-card p {
+  font-size: 0.8125rem;
   color: var(--text-secondary);
   line-height: 1.6;
 }
 
-.footer-socials {
+/* How it works */
+.how {
+  padding: var(--space-20) var(--space-8);
+  border-top: 1px solid var(--color-border);
+}
+.how-inner {
+  max-width: var(--max-width);
+  margin: 0 auto;
+}
+.steps {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: var(--space-8);
+  margin-top: var(--space-12);
+}
+.step {
   display: flex;
+  flex-direction: column;
   gap: var(--space-3);
-  margin-top: var(--space-2);
 }
-
-.social-link {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 36px;
-  height: 36px;
-  border-radius: var(--radius-md);
-  background: var(--color-glass);
-  border: 1px solid var(--color-glass-border);
+.step-num {
+  font-size: 0.75rem;
+  font-weight: 600;
+  font-family: var(--font-mono);
+  color: var(--text-muted);
+}
+.step h3 {
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+.step p {
+  font-size: 0.8125rem;
   color: var(--text-secondary);
-  transition: all var(--transition-base);
+  line-height: 1.6;
 }
 
-.social-link:hover {
-  background: var(--color-glass-hover);
-  color: var(--text-primary);
-  border-color: rgba(255, 255, 255, 0.15);
-  transform: translateY(-2px);
+/* CTA */
+.cta-section {
+  padding: var(--space-20) var(--space-8);
+  border-top: 1px solid var(--color-border);
 }
-
-.footer-title {
-  font-size: 0.95rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: var(--text-primary);
+.cta-inner {
+  max-width: var(--max-width);
+  margin: 0 auto;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-4);
+}
+.cta-inner h2 {
+  font-size: clamp(1.5rem, 3vw, 2rem);
+  letter-spacing: -0.03em;
+}
+.cta-inner p {
+  font-size: 1rem;
+  color: var(--text-secondary);
   margin-bottom: var(--space-2);
 }
 
-.footer-links {
-  list-style: none;
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
-  padding: 0;
-  margin: 0;
+/* Footer */
+.home-footer {
+  border-top: 1px solid var(--color-border);
+  padding: var(--space-10) var(--space-8);
 }
-
-.footer-link {
-  font-size: 0.9rem;
-  color: var(--text-secondary);
-  transition: color var(--transition-fast);
-  text-decoration: none;
-  display: inline-block;
+.footer-inner {
+  max-width: var(--max-width);
+  margin: 0 auto;
 }
-
-.footer-link:hover {
-  color: var(--text-primary);
-}
-
-.footer-details {
-  list-style: none;
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
-  padding: 0;
-  margin: 0;
-}
-
-.footer-details li {
-  font-size: 0.9rem;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.detail-label {
-  font-size: 0.75rem;
-  color: var(--text-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-}
-
-.detail-value {
-  color: var(--text-secondary);
-  transition: color var(--transition-fast);
-}
-
-.detail-value[href]:hover {
-  color: var(--text-primary);
-}
-
-.built-with .detail-value {
-  color: var(--color-primary);
-  font-weight: 500;
-}
-
-.footer-bottom {
-  border-top: 1px solid var(--color-glass-border);
-  padding-top: var(--space-6);
+.footer-top {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  flex-wrap: wrap;
-  gap: var(--space-4);
+  margin-bottom: var(--space-8);
 }
-
-.copyright {
-  font-size: 0.85rem;
+.footer-brand {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
   color: var(--text-muted);
-  margin: 0;
+  font-size: 0.875rem;
+  font-weight: 500;
 }
-
-.footer-legal {
+.footer-links {
   display: flex;
   gap: var(--space-6);
 }
-
-@media (max-width: 900px) {
-  .footer-grid {
-    grid-template-columns: 1fr 1fr;
-    gap: var(--space-8);
-  }
-  .brand-col {
-    grid-column: span 2;
-    padding-right: 0;
-  }
+.footer-links a {
+  font-size: 0.8125rem;
+  color: var(--text-muted);
+  text-decoration: none;
+  transition: color var(--transition-fast);
+}
+.footer-links a:hover { color: var(--text-primary); }
+.footer-bottom p {
+  font-size: 0.75rem;
+  color: var(--text-muted);
 }
 
-@media (max-width: 600px) {
-  .footer-grid {
+/* Responsive */
+@media (max-width: 1024px) {
+  .hero-grid {
     grid-template-columns: 1fr;
-    gap: var(--space-6);
+    gap: var(--space-10);
   }
-  .brand-col {
-    grid-column: span 1;
-  }
-  .footer-bottom {
-    flex-direction: column;
-    align-items: center;
-    text-align: center;
-  }
-}
-
-
-@media (max-width: 900px) {
-  .hero-section {
-    min-height: auto;
-    padding: var(--space-8) var(--space-4) var(--space-12);
-  }
-  .hero-container {
-    grid-template-columns: 1fr;
-    gap: var(--space-8);
-    text-align: center;
-  }
-  .hero-content {
-    align-items: center;
-    text-align: center;
-  }
-  .hero-actions {
-    flex-direction: column;
-    gap: var(--space-3);
-    margin: 0 auto;
-    width: 100%;
-    max-width: 420px;
-  }
-  .hero-cta {
-    width: 100%;
-  }
-  .join-group {
-    width: 100%;
+  .hero-inner {
     max-width: 100%;
-  }
-  .actions-divider {
-    display: none;
-  }
-  .error-msg {
-    text-align: center;
+    text-align: left;
   }
   .hero-preview-wrapper {
-    max-width: 550px;
+    max-width: 560px;
     margin: 0 auto;
   }
 }
-
+@media (max-width: 900px) {
+  .features-grid { grid-template-columns: repeat(2, 1fr); }
+  .steps { grid-template-columns: repeat(2, 1fr); }
+  .hero { padding: var(--space-16) var(--space-6) var(--space-12); }
+  .hero-actions { flex-direction: column; align-items: flex-start; gap: var(--space-3); }
+  .hero-join { width: 100%; }
+  .hero-join input { flex: 1; width: auto; }
+}
 @media (max-width: 640px) {
   .hamburger-btn { display: flex; }
   .nav-links {
@@ -1551,24 +1095,27 @@ const features = [
     left: 0;
     right: 0;
     flex-direction: column;
-    align-items: stretch;
-    gap: 0;
-    background: color-mix(in srgb, var(--color-bg-base) 95%, transparent);
-    backdrop-filter: blur(20px);
-    -webkit-backdrop-filter: blur(20px);
-    border-bottom: 1px solid var(--color-glass-border);
+    background: rgba(10,10,10,0.96);
+    backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--color-border);
     padding: var(--space-2) var(--space-4);
-    z-index: var(--z-overlay);
   }
   .nav-links--open { display: flex; }
   .nav-link { padding: var(--space-3) var(--space-2); }
-  .home-nav { padding: var(--space-3) var(--space-4); position: relative; }
-  .hero-section {
-    min-height: auto;
-    padding: var(--space-6) var(--space-4) var(--space-10);
-  }
+  .home-nav { padding: 0 var(--space-4); }
+  .features-grid { grid-template-columns: 1fr; }
+  .steps { grid-template-columns: 1fr; gap: var(--space-6); }
+  .flash-banner { margin: var(--space-3) var(--space-4) 0; }
+  .hero { padding: var(--space-12) var(--space-4) var(--space-10); }
+  .features, .how, .cta-section { padding: var(--space-12) var(--space-4); }
+  .home-footer { padding: var(--space-8) var(--space-4); }
+  .footer-top { flex-direction: column; gap: var(--space-4); align-items: flex-start; }
   .preview-content {
     grid-template-columns: 1.2fr 1fr;
+    height: 280px;
   }
+  .mock-meta-title { font-size: 0.7rem; }
+  .mock-status-pill { display: none; }
+  .address-bar span { font-size: 0.65rem; }
 }
 </style>

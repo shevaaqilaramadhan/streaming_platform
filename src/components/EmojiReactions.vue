@@ -147,8 +147,8 @@ function selectEmoji(emoji) {
   transform: scale(1.1);
 }
 .emoji-trigger--open {
-  background: var(--color-primary);
-  border-color: var(--color-primary);
+  background: rgba(255,255,255,0.15);
+  border-color: rgba(255,255,255,0.2);
   color: white;
 }
 
@@ -161,7 +161,7 @@ function selectEmoji(emoji) {
   gap: var(--space-1);
   padding: var(--space-2);
   border-radius: var(--radius-lg);
-  background: rgba(10, 11, 16, 0.9) !important;
+  background: rgba(20,20,22,0.95) !important;
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
   box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);

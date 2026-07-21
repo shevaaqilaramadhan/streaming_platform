@@ -41,6 +41,23 @@ export const MSG_TYPES = {
   TYPING: 'TYPING',
 }
 
+/** True for URLs the player can load immediately (no server scrape). */
+export function isDirectPlayableUrl(url) {
+  if (!url || typeof url !== 'string') return false
+  const u = url.trim()
+  if (!u) return false
+  // YouTube
+  if (/youtube\.com|youtu\.be/i.test(u)) return true
+  if (/^[a-zA-Z0-9_-]{11}$/.test(u)) return true
+  // Direct media extensions (ignore query string)
+  try {
+    const path = new URL(u).pathname.toLowerCase()
+    return /\.(mp4|m3u8|webm|mkv|ogg)$/i.test(path)
+  } catch {
+    return false
+  }
+}
+
 export function useRoom(roomId, nickname, hostToken = '') {
   const { status, WS_STATUS, connect, disconnect, send, onMessage } = useWebSocket(roomId)
 
@@ -91,6 +108,45 @@ export function useRoom(roomId, nickname, hostToken = '') {
 
   /* ---- Scrape loading state ---- */
   const scrapeLoading = ref(false)
+  /** Auto-clear stuck scrapeLoading (e.g. guests never get SCRAPE_ERROR). */
+  const SCRAPE_LOADING_TIMEOUT_MS = 120_000
+  let scrapeLoadingTimer = null
+
+  function clearScrapeLoadingTimer() {
+    if (scrapeLoadingTimer != null) {
+      clearTimeout(scrapeLoadingTimer)
+      scrapeLoadingTimer = null
+    }
+  }
+
+  function startScrapeLoading() {
+    scrapeLoading.value = true
+    clearScrapeLoadingTimer()
+    scrapeLoadingTimer = setTimeout(() => {
+      scrapeLoadingTimer = null
+      if (scrapeLoading.value) {
+        scrapeLoading.value = false
+        // Soft message for guests stuck on "Resolving stream…" when host scrape fails
+        // without a room-wide SCRAPE_ERROR broadcast.
+        if (!scrapeError.value) {
+          scrapeError.value = {
+            originalUrl: '',
+            error: 'Stream resolution timed out. The host may need to try again.',
+          }
+          setTimeout(() => {
+            if (scrapeError.value?.error?.includes('timed out')) {
+              scrapeError.value = null
+            }
+          }, 8000)
+        }
+      }
+    }, SCRAPE_LOADING_TIMEOUT_MS)
+  }
+
+  function stopScrapeLoading() {
+    clearScrapeLoadingTimer()
+    scrapeLoading.value = false
+  }
 
   /* ---- Typing indicator state ---- */
   const typingUsers = ref([])  // [{ userId, username, timeout }]
@@ -165,21 +221,32 @@ export function useRoom(roomId, nickname, hostToken = '') {
         }
         break
 
-      case MSG_TYPES.HOST_CHANGED:
+      case MSG_TYPES.HOST_CHANGED: {
+        const wasHost = isHost.value
         if (data.payload?.newHostId) {
           hostId.value = data.payload.newHostId
           const amHost = data.payload.newHostId === localUserId.value
           isHost.value = amHost
+          let text
+          if (amHost) {
+            text = 'You are now the host'
+          } else if (wasHost) {
+            // FE-L03: clearer UX when this user lost host (e.g. reconnect reassignment)
+            text = data.payload.username
+              ? `Host role was reassigned to ${data.payload.username}`
+              : 'Host role was reassigned'
+          } else {
+            text = `${data.payload.username || 'Someone'} is now the host`
+          }
           messages.value.push({
             id:     Date.now() + Math.random(),
             type:   'system',
-            text:   amHost
-              ? 'You are now the host'
-              : `${data.payload.username || 'Someone'} is now the host`,
+            text,
             sentAt: Date.now(),
           })
         }
         break
+      }
 
       case MSG_TYPES.TOGGLE_PUBLIC:
         if (typeof data.payload?.isPublic === 'boolean') {
@@ -317,7 +384,7 @@ export function useRoom(roomId, nickname, hostToken = '') {
         playerState.value.currentTime = 0
         playerState.value.isPlaying   = false
         scrapeError.value = null  // clear previous error on successful video load
-        scrapeLoading.value = false  // clear scrape loading
+        stopScrapeLoading()
         break
 
       case MSG_TYPES.SCRAPE_ERROR:
@@ -325,18 +392,18 @@ export function useRoom(roomId, nickname, hostToken = '') {
           originalUrl: data.payload.originalUrl,
           error:       data.payload.error,
         }
-        scrapeLoading.value = false  // clear scrape loading
+        stopScrapeLoading()
         console.error('[Scrape] Failed:', data.payload.error, 'URL:', data.payload.originalUrl)
         // Auto-clear after 8 seconds
         setTimeout(() => { scrapeError.value = null }, 8000)
         break
 
       case MSG_TYPES.SCRAPE_STARTED:
-        scrapeLoading.value = true
+        startScrapeLoading()
         break
 
       case MSG_TYPES.SCRAPE_FINISHED:
-        scrapeLoading.value = false
+        stopScrapeLoading()
         break
 
       case MSG_TYPES.QUEUE_UPDATE:
@@ -349,7 +416,7 @@ export function useRoom(roomId, nickname, hostToken = '') {
         playerState.value.currentTime = 0
         playerState.value.isPlaying   = false
         scrapeError.value             = null
-        scrapeLoading.value           = false
+        stopScrapeLoading()
         break
 
       default:
@@ -398,7 +465,15 @@ export function useRoom(roomId, nickname, hostToken = '') {
 
   function setVideo(url) {
     if (!isHost.value) return
-    playerState.value.videoUrl = url
+    // Only optimistically set direct/playable URLs. Anime page URLs must wait for
+    // server scrape → SET_VIDEO with the resolved stream (googlevideo / .mp4 / .m3u8).
+    // Setting the page URL here made <video> load HTML via /api/proxy → "Unable to play".
+    if (isDirectPlayableUrl(url)) {
+      playerState.value.videoUrl = url
+    } else {
+      startScrapeLoading()
+      scrapeError.value = null
+    }
     send({
       action: MSG_TYPES.SET_VIDEO,
       payload: { roomId, url },
@@ -406,6 +481,8 @@ export function useRoom(roomId, nickname, hostToken = '') {
   }
 
   function leave() {
+    clearScrapeLoadingTimer()
+    scrapeLoading.value = false
     unregister?.()
     // permanent if kicked so online-event / timers cannot reopen the socket
     disconnect(wasKicked ? { permanent: true } : {})

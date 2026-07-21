@@ -3,15 +3,9 @@
     <!-- Nav -->
     <nav class="home-nav">
       <router-link to="/" class="nav-logo">
-        <svg width="28" height="28" viewBox="0 0 28 28" fill="none">
-          <circle cx="14" cy="14" r="14" fill="url(#faq-logo-grad)"/>
-          <polygon points="11,9 21,14 11,19" fill="white"/>
-          <defs>
-            <linearGradient id="faq-logo-grad" x1="0" y1="0" x2="28" y2="28">
-              <stop offset="0%" stop-color="hsl(195,100%,45%)"/>
-              <stop offset="100%" stop-color="hsl(215,90%,50%)"/>
-            </linearGradient>
-          </defs>
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+          <rect x="2" y="2" width="24" height="24" rx="6" fill="#fff" fill-opacity="0.08" stroke="#fff" stroke-width="1.2" stroke-opacity="0.2"/>
+          <polygon points="12,9 21,14 12,19" fill="#fff" fill-opacity="0.7"/>
         </svg>
         <span class="nav-brand">WatchParty</span>
       </router-link>
@@ -351,17 +345,18 @@ function toggle(key) {
   padding: 0 var(--space-8);
   height: 56px;
   position: sticky; top: 0; z-index: var(--z-overlay);
-  background: color-mix(in srgb, var(--color-bg-base) 82%, transparent);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border-bottom: 1px solid var(--color-glass-border);
+  background: rgba(10,10,10,0.85);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--color-border);
 }
 .nav-logo {
   display: flex; align-items: center; gap: var(--space-2);
   text-decoration: none;
 }
 .nav-brand {
-  font-size: 1.05rem; font-weight: 700; letter-spacing: -0.02em;
+  color: var(--text-primary);
+  font-size: 0.9375rem; font-weight: 600; letter-spacing: -0.02em;
   color: var(--text-primary);
 }
 .nav-links { display: flex; align-items: center; gap: var(--space-1); margin-left: auto; }
@@ -378,29 +373,29 @@ function toggle(key) {
   height: 36px;
   border-radius: var(--radius-sm);
   background: transparent;
-  border: 1px solid var(--color-glass-border);
+  border: 1px solid var(--color-border);
   color: var(--text-secondary);
   cursor: pointer;
   transition: all var(--transition-fast);
 }
 .hamburger-btn:hover {
   color: var(--text-primary);
-  background: var(--color-glass-hover);
+  background: var(--color-fill-hover);
 }
 .nav-link {
   display: inline-flex; align-items: center; gap: 5px;
-  padding: 6px 12px; border-radius: var(--radius-sm);
-  font-size: 0.875rem; font-weight: 500;
+  padding: 6px 14px; border-radius: var(--radius-sm);
+  font-size: 0.8125rem; font-weight: 500;
   color: var(--text-secondary); text-decoration: none;
   transition: all var(--transition-fast);
 }
 .nav-link:hover {
   color: var(--text-primary);
-  background: var(--color-glass-hover);
+  background: var(--color-fill-hover);
 }
 .nav-link.active {
   color: var(--text-primary);
-  background: var(--color-glass-hover);
+  background: var(--color-fill-hover);
 }
 .nav-link svg { opacity: 0.7; }
 .nav-link:hover svg, .nav-link.active svg { opacity: 1; }
@@ -417,9 +412,9 @@ function toggle(key) {
   display: inline-flex; align-items: center; gap: 6px;
   padding: 4px 14px; border-radius: var(--radius-full);
   font-size: 0.8rem; font-weight: 600;
-  background: var(--grad-brand-subtle);
-  border: 1px solid hsla(195, 100%, 45%, 0.2);
-  color: var(--color-primary);
+  background: var(--color-fill);
+  border: 1px solid var(--color-border);
+  color: var(--text-secondary);
   margin-bottom: var(--space-4);
 }
 .faq-hero-title {
@@ -445,8 +440,8 @@ function toggle(key) {
   transition: all var(--transition-base);
 }
 .faq-search:focus-within {
-  border-color: var(--color-primary);
-  box-shadow: 0 0 0 3px hsla(195, 100%, 45%, 0.15);
+  border-color: var(--color-border-strong);
+  box-shadow: 0 0 0 3px rgba(255,255,255,0.04);
 }
 .faq-search svg { color: var(--text-muted); flex-shrink: 0; }
 .search-input {
@@ -476,19 +471,19 @@ function toggle(key) {
   padding: 8px 16px; border-radius: var(--radius-full);
   font-family: var(--font-sans); font-size: 0.85rem;
   font-weight: 600; color: var(--text-secondary);
-  background: var(--color-glass);
-  border: 1px solid var(--color-glass-border);
+  background: var(--color-fill);
+  border: 1px solid var(--color-border);
   cursor: pointer; white-space: nowrap;
   transition: all var(--transition-base);
 }
 .faq-tab:hover {
-  background: var(--color-glass-hover);
+  background: var(--color-fill-hover);
   color: var(--text-primary);
 }
 .faq-tab.active {
-  background: var(--grad-brand-subtle);
-  border-color: hsla(195, 100%, 45%, 0.3);
-  color: var(--color-primary);
+  background: var(--color-fill-hover);
+  border-color: var(--color-border-strong);
+  color: var(--text-primary);
 }
 .tab-icon { font-size: 1rem; }
 
@@ -520,8 +515,8 @@ function toggle(key) {
   border-color: rgba(255, 255, 255, 0.1);
 }
 .faq-item.open {
-  border-color: hsla(195, 100%, 45%, 0.2);
-  background: rgba(255, 255, 255, 0.03);
+  border-color: var(--color-border-strong);
+  background: var(--color-fill);
 }
 
 .faq-question {
@@ -610,10 +605,10 @@ function toggle(key) {
     flex-direction: column;
     align-items: stretch;
     gap: 0;
-    background: color-mix(in srgb, var(--color-bg-base) 95%, transparent);
+    background: rgba(10,10,10,0.96);
     backdrop-filter: blur(20px);
     -webkit-backdrop-filter: blur(20px);
-    border-bottom: 1px solid var(--color-glass-border);
+    border-bottom: 1px solid var(--color-border);
     padding: var(--space-2) var(--space-4);
     z-index: var(--z-overlay);
   }

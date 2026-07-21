@@ -1,19 +1,13 @@
 <template>
   <div class="lobby-page">
     <!-- Nav (reuse from HomePage style) -->
-    <nav class="home-nav glass">
+    <nav class="home-nav">
       <div class="nav-logo">
-        <svg width="32" height="32" viewBox="0 0 28 28" fill="none">
-          <circle cx="14" cy="14" r="14" fill="url(#lobby-logo-grad)"/>
-          <polygon points="11,9 21,14 11,19" fill="white"/>
-          <defs>
-            <linearGradient id="lobby-logo-grad" x1="0" y1="0" x2="28" y2="28">
-              <stop offset="0%" stop-color="hsl(195,100%,45%)"/>
-              <stop offset="100%" stop-color="hsl(215,90%,50%)"/>
-            </linearGradient>
-          </defs>
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+          <rect x="1" y="1" width="22" height="22" rx="5" stroke="currentColor" stroke-width="1.5"/>
+          <polygon points="10,7 18,12 10,17" fill="currentColor"/>
         </svg>
-        <span class="gradient-text nav-brand">WatchParty</span>
+        <span class="nav-brand">WatchParty</span>
       </div>
       <div class="nav-right">
         <router-link to="/" class="nav-link">Home</router-link>
@@ -23,7 +17,7 @@
 
     <!-- Header -->
     <header class="lobby-header">
-      <h1 class="gradient-text lobby-title">Public Rooms</h1>
+      <h1 class="lobby-title">Public Rooms</h1>
       <p class="lobby-subtitle">Join an active watch party or create your own</p>
     </header>
 
@@ -110,7 +104,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, onMounted, onUnmounted, onDeactivated } from 'vue'
 import { useRouter } from 'vue-router'
 import ThemeToggle from '../components/ThemeToggle.vue'
 
@@ -119,6 +113,13 @@ const rooms = ref([])
 const loading = ref(true)
 const error = ref(null)
 let pollInterval = null
+
+function stopPolling() {
+  if (pollInterval) {
+    clearInterval(pollInterval)
+    pollInterval = null
+  }
+}
 
 async function fetchPublicRooms() {
   try {
@@ -153,7 +154,12 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
-  if (pollInterval) clearInterval(pollInterval)
+  stopPolling()
+})
+
+// FE-L02: defense if KeepAlive is ever used (onUnmounted alone won't fire)
+onDeactivated(() => {
+  stopPolling()
 })
 </script>
 
@@ -167,14 +173,25 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 var(--space-6);
-  height: 56px;
+  padding: 0 var(--space-8);
+  height: var(--nav-height);
+  position: sticky;
+  top: 0;
+  z-index: var(--z-overlay);
+  background: rgba(10,10,10,0.85);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--color-border);
 }
 
 .nav-logo {
   display: flex;
   align-items: center;
   gap: var(--space-2);
+  color: var(--text-primary);
+  font-weight: 600;
+  font-size: 0.9375rem;
+  letter-spacing: -0.02em;
 }
 
 .nav-right {
@@ -187,12 +204,16 @@ onUnmounted(() => {
 .nav-link {
   color: var(--text-secondary);
   font-weight: 500;
-  font-size: 0.875rem;
+  font-size: 0.8125rem;
   text-decoration: none;
+  padding: 6px 14px;
+  border-radius: var(--radius-sm);
+  transition: all var(--transition-fast);
 }
 
 .nav-link:hover {
   color: var(--text-primary);
+  background: var(--color-fill);
 }
 
 .lobby-header {
@@ -205,6 +226,7 @@ onUnmounted(() => {
   font-weight: 800;
   letter-spacing: -0.04em;
   margin: 0 0 var(--space-2);
+  color: var(--text-primary);
 }
 
 .lobby-subtitle {
@@ -229,8 +251,8 @@ onUnmounted(() => {
 
 .spinner {
   width: 32px; height: 32px;
-  border: 3px solid rgba(255,255,255,0.1);
-  border-top-color: var(--color-primary);
+  border: 2px solid rgba(255,255,255,0.08);
+  border-top-color: var(--text-secondary);
   border-radius: 50%;
   animation: spin-slow 0.8s linear infinite;
 }
@@ -268,7 +290,7 @@ onUnmounted(() => {
 .room-card:hover {
   transform: translateY(-4px);
   border-color: rgba(255, 255, 255, 0.12);
-  box-shadow: var(--shadow-card), var(--shadow-glow-sm);
+  box-shadow: var(--shadow-card);
 }
 
 .room-card-thumbnail {
@@ -346,7 +368,7 @@ onUnmounted(() => {
 }
 
 .room-card-host {
-  color: var(--color-primary);
+  color: var(--text-secondary);
   font-weight: 600;
 }
 </style>

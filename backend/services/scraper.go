@@ -112,22 +112,66 @@ func copyVideoMetadata(m *models.VideoMetadata) *models.VideoMetadata {
 	return &c
 }
 
+// isPlayableStreamURL reports whether u looks like a real media stream
+// (not an anime episode HTML page). Used to reject bad scrape results / cache.
+func isPlayableStreamURL(u string) bool {
+	u = strings.TrimSpace(u)
+	if u == "" {
+		return false
+	}
+	lower := strings.ToLower(u)
+	if strings.Contains(lower, "googlevideo.com") || strings.Contains(lower, "videoplayback") {
+		return true
+	}
+	parsed, err := url.Parse(u)
+	if err != nil || parsed.Host == "" {
+		return false
+	}
+	path := strings.ToLower(parsed.Path)
+	if strings.HasSuffix(path, ".mp4") || strings.HasSuffix(path, ".m3u8") ||
+		strings.HasSuffix(path, ".webm") || strings.HasSuffix(path, ".mkv") {
+		return true
+	}
+	// Common stream path markers
+	if strings.Contains(path, "/hls/") || strings.Contains(path, "/stream/") ||
+		strings.Contains(lower, ".m3u8") || strings.Contains(lower, ".mp4?") {
+		return true
+	}
+	return false
+}
+
+// InvalidateScrapeCache removes a page URL from the scrape cache (e.g. bad entry).
+func InvalidateScrapeCache(pageURL string) {
+	scrapeCacheMu.Lock()
+	delete(scrapeCache, pageURL)
+	scrapeCacheMu.Unlock()
+}
+
 // ScrapeStreamURLCached wraps ScrapeStreamURL with an in-memory TTL cache,
 // singleflight stampede protection, and defensive metadata copies.
 func ScrapeStreamURLCached(pageURL string) (*models.VideoMetadata, error) {
 	scrapeCacheMu.RLock()
 	if entry, ok := scrapeCache[pageURL]; ok && time.Now().Before(entry.expiresAt) {
+		// Drop poisoned cache entries (page URL stored as VideoURL)
+		if entry.metadata != nil && isPlayableStreamURL(entry.metadata.VideoURL) {
+			scrapeCacheMu.RUnlock()
+			log.Printf("Cache hit for %s", pageURL)
+			return copyVideoMetadata(entry.metadata), nil
+		}
 		scrapeCacheMu.RUnlock()
-		log.Printf("Cache hit for %s", pageURL)
-		return copyVideoMetadata(entry.metadata), nil
+		InvalidateScrapeCache(pageURL)
+		log.Printf("Cache invalidated (non-playable VideoURL) for %s", pageURL)
+	} else {
+		scrapeCacheMu.RUnlock()
 	}
-	scrapeCacheMu.RUnlock()
 
 	v, err, _ := scrapeGroup.Do(pageURL, func() (interface{}, error) {
 		scrapeCacheMu.RLock()
 		if entry, ok := scrapeCache[pageURL]; ok && time.Now().Before(entry.expiresAt) {
-			scrapeCacheMu.RUnlock()
-			return copyVideoMetadata(entry.metadata), nil
+			if entry.metadata != nil && isPlayableStreamURL(entry.metadata.VideoURL) {
+				scrapeCacheMu.RUnlock()
+				return copyVideoMetadata(entry.metadata), nil
+			}
 		}
 		scrapeCacheMu.RUnlock()
 
@@ -135,10 +179,15 @@ func ScrapeStreamURLCached(pageURL string) (*models.VideoMetadata, error) {
 		if err != nil {
 			return nil, err
 		}
-
-		if metadata != nil {
-			RegisterStreamMetadata(metadata.VideoURL, metadata.ThumbnailURL)
+		if metadata == nil || !isPlayableStreamURL(metadata.VideoURL) {
+			vu := ""
+			if metadata != nil {
+				vu = metadata.VideoURL
+			}
+			return nil, fmt.Errorf("scrape returned non-playable URL for %s: %s", pageURL, truncateURL(vu, 80))
 		}
+
+		RegisterStreamMetadata(metadata.VideoURL, metadata.ThumbnailURL)
 
 		stored := copyVideoMetadata(metadata)
 		scrapeCacheMu.Lock()
@@ -336,6 +385,8 @@ func detectSitePlatform(pageURL string) string {
 		return "nanime"
 	case strings.Contains(domain, "idlix"):
 		return "idlix"
+	case strings.Contains(domain, "sokuja"):
+		return "sokuja"
 	default:
 		return "generic"
 	}
@@ -347,68 +398,243 @@ func isBloggerVideoURL(rawURL string) bool {
 		(strings.Contains(rawURL, "blogspot.com") && strings.Contains(rawURL, "/video."))
 }
 
-// extractBloggerVideoURL fetches a Blogger video page and extracts the actual
-// stream URL (MP4/M3U8) from the embedded JSON data in the page's script tags.
-// Blogger stores video metadata in a JSON blob that contains "play_url" or
-// direct download URLs.
+var (
+	bloggerTokenRe = regexp.MustCompile(`(?i)[?&]token=([^&]+)`)
+	// batchexecute embeds progressive MP4s; body may use \u003d / \u0026 escapes
+	bloggerGooglevideoRe = regexp.MustCompile(`https://[^"'\s]+googlevideo\.com/videoplayback[^"'\s]*`)
+	bloggerLegacyPlayRe  = []*regexp.Regexp{
+		regexp.MustCompile(`"play_url"\s*:\s*"(https?://[^"]+)"`),
+		regexp.MustCompile(`"stream_url"\s*:\s*"(https?://[^"]+)"`),
+		regexp.MustCompile(`"download_url"\s*:\s*"(https?://[^"]+)"`),
+		regexp.MustCompile(`"downloadUrl"\s*:\s*"(https?://[^"]+)"`),
+		regexp.MustCompile(`var\s+_play_url\s*=\s*['"](https?://[^'"]+)['"]`),
+	}
+)
+
+func unescapeBloggerURL(raw string) string {
+	s := raw
+	// Nested batchexecute JSON often has \\u003d which becomes \= after one pass.
+	// Loop until stable so we fully decode.
+	for i := 0; i < 5; i++ {
+		prev := s
+		s = strings.ReplaceAll(s, `\u003d`, "=")
+		s = strings.ReplaceAll(s, `\u0026`, "&")
+		s = strings.ReplaceAll(s, `\u002f`, "/")
+		s = strings.ReplaceAll(s, `\u002F`, "/")
+		s = strings.ReplaceAll(s, `\/`, "/")
+		// Residual after partial decode of \\u003d → \=
+		s = strings.ReplaceAll(s, `\=`, "=")
+		s = strings.ReplaceAll(s, `\&`, "&")
+		s = strings.ReplaceAll(s, `\/`, "/")
+		if s == prev {
+			break
+		}
+	}
+	// Strip trailing JSON debris
+	s = strings.TrimRight(s, `",]\ `)
+	s = strings.TrimSpace(s)
+	return s
+}
+
+func extractBloggerToken(bloggerPageURL string) string {
+	if m := bloggerTokenRe.FindStringSubmatch(bloggerPageURL); len(m) > 1 {
+		tok, err := url.QueryUnescape(m[1])
+		if err == nil && tok != "" {
+			return tok
+		}
+		return m[1]
+	}
+	return ""
+}
+
+func bloggerItagScore(videoURL string) int {
+	// Prefer higher progressive quality: itag 22 (720p) > 18 (360p)
+	u, err := url.Parse(videoURL)
+	if err != nil {
+		return 0
+	}
+	itag := u.Query().Get("itag")
+	switch itag {
+	case "22":
+		return 300
+	case "18":
+		return 100
+	case "37", "38":
+		return 400
+	default:
+		if n, e := strconv.Atoi(itag); e == nil {
+			return n
+		}
+		return 1
+	}
+}
+
+func pickBestBloggerStream(urls []string) string {
+	best := ""
+	bestScore := -1
+	seen := make(map[string]bool)
+	for _, raw := range urls {
+		u := unescapeBloggerURL(raw)
+		if !strings.Contains(u, "googlevideo.com/videoplayback") &&
+			!strings.Contains(u, ".mp4") &&
+			!strings.Contains(u, ".m3u8") {
+			continue
+		}
+		if !strings.HasPrefix(u, "http") {
+			continue
+		}
+		if seen[u] {
+			continue
+		}
+		seen[u] = true
+		score := bloggerItagScore(u)
+		if score > bestScore {
+			bestScore = score
+			best = u
+		}
+	}
+	return best
+}
+
+// fetchBloggerViaBatchexecute resolves modern Blogger video.g players.
+// As of 2025+, play_url is no longer in HTML — the SPA POSTs to
+// /_/BloggerVideoPlayerUi/data/batchexecute with rpcid WcwnYd and receives
+// googlevideo.com/videoplayback progressive MP4 URLs.
+func fetchBloggerViaBatchexecute(token, referer string) (string, error) {
+	if token == "" {
+		return "", fmt.Errorf("missing blogger token")
+	}
+
+	// f.req shape (matches browser): [[["WcwnYd","[\"TOKEN\",null,0]",null,"generic"]]]
+	innerArgs, err := json.Marshal([]interface{}{token, nil, 0})
+	if err != nil {
+		return "", err
+	}
+	outer, err := json.Marshal([][]interface{}{
+		{"WcwnYd", string(innerArgs), nil, "generic"},
+	})
+	if err != nil {
+		return "", err
+	}
+	// Wrap one more array level: [[...]]
+	freq := "[" + string(outer) + "]"
+
+	endpoint := "https://www.blogger.com/_/BloggerVideoPlayerUi/data/batchexecute?rpcids=WcwnYd&source-path=%2Fvideo.g&bl=boq_bloggeruiserver_20260715.01_p0&hl=en-US&rt=c"
+	form := url.Values{}
+	form.Set("f.req", freq)
+
+	req, err := http.NewRequest("POST", endpoint, strings.NewReader(form.Encode()))
+	if err != nil {
+		return "", err
+	}
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded;charset=UTF-8")
+	req.Header.Set("User-Agent", getRandomUserAgent())
+	req.Header.Set("X-Same-Domain", "1")
+	if referer != "" {
+		req.Header.Set("Referer", referer)
+	} else {
+		req.Header.Set("Referer", "https://www.blogger.com/")
+	}
+	req.Header.Set("Origin", "https://www.blogger.com")
+
+	resp, err := httpClient.Do(req)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != 200 {
+		return "", fmt.Errorf("blogger batchexecute HTTP %d", resp.StatusCode)
+	}
+	body, err := io.ReadAll(io.LimitReader(resp.Body, 2*1024*1024))
+	if err != nil {
+		return "", err
+	}
+	text := string(body)
+
+	// Fully decode nested JSON escapes (\u003d, \\u003d → =, residual \=)
+	normalized := unescapeBloggerURL(text)
+
+	rawMatches := bloggerGooglevideoRe.FindAllString(normalized, -1)
+	if best := pickBestBloggerStream(rawMatches); best != "" {
+		// Final sanitize — never return backslash-escaped query strings
+		best = unescapeBloggerURL(best)
+		if strings.Contains(best, `\`) {
+			best = strings.ReplaceAll(best, `\`, "")
+		}
+		return best, nil
+	}
+	return "", fmt.Errorf("no googlevideo URL in batchexecute response")
+}
+
+// extractBloggerVideoURL resolves a Blogger video.g?token=… page to a direct
+// progressive MP4 (googlevideo). Prefers the modern batchexecute API; falls
+// back to legacy play_url JSON embedded in HTML for older players.
 func extractBloggerVideoURL(bloggerPageURL, referer string) (string, error) {
+	token := extractBloggerToken(bloggerPageURL)
+	if token != "" {
+		if videoURL, err := fetchBloggerViaBatchexecute(token, referer); err == nil && videoURL != "" {
+			return videoURL, nil
+		}
+	}
+
 	html, err := fetchPageHTML(bloggerPageURL, referer)
 	if err != nil {
 		return "", fmt.Errorf("failed to fetch Blogger page: %w", err)
 	}
 
-	// Blogger video pages embed the video URL in JSON inside <script> tags.
-	// Common patterns seen in Blogger video pages:
-	//   "play_url":"https://...mp4"
-	//   "stream_url":"https://...m3u8"
-	//   "downloadUrl":"https://..."
-	// The URLs may contain \u0026 for & in query params.
-	bloggerPatterns := []*regexp.Regexp{
-		regexp.MustCompile(`"play_url"\s*:\s*"(https?://[^"]+)"`),
-		regexp.MustCompile(`"stream_url"\s*:\s*"(https?://[^"]+)"`),
-		regexp.MustCompile(`"download_url"\s*:\s*"(https?://[^"]+)"`),
-		regexp.MustCompile(`"downloadUrl"\s*:\s*"(https?://[^"]+)"`),
-		// Blogger sometimes uses escaped JSON with \u0026
-		regexp.MustCompile(`"play_url"\s*:\s*"(https?://[^"]+?\.mp4[^"]*)"`),
-		regexp.MustCompile(`"play_url"\s*:\s*"(https?://[^"]+?\.m3u8[^"]*)"`),
-		// Generic video source pattern in Blogger pages
-		regexp.MustCompile(`var\s+_play_url\s*=\s*['"](https?://[^'"]+)['"]`),
-	}
-
-	for _, re := range bloggerPatterns {
+	for _, re := range bloggerLegacyPlayRe {
 		if match := re.FindStringSubmatch(html); len(match) > 1 {
-			videoURL := match[1]
-			// Unescape \u0026 → & (Go uses \u0026 in JSON for &)
-			videoURL = strings.ReplaceAll(videoURL, `\u0026`, "&")
-			videoURL = strings.ReplaceAll(videoURL, `\u003d`, "=")
-			return videoURL, nil
+			return unescapeBloggerURL(match[1]), nil
 		}
 	}
 
-	// Fallback: check for direct stream URLs in the Blogger page HTML
 	if streamURL := findStreamURLInHTML(html); streamURL != "" {
 		return streamURL, nil
 	}
-
-	// Fallback: check script tag contents
 	if streamURL := findStreamURLInScripts(html); streamURL != "" {
 		return streamURL, nil
+	}
+
+	// Last resort: token may still work even if first batchexecute attempt failed
+	if token != "" {
+		if videoURL, err := fetchBloggerViaBatchexecute(token, "https://www.blogger.com/"); err == nil && videoURL != "" {
+			return videoURL, nil
+		}
 	}
 
 	return "", fmt.Errorf("could not extract video URL from Blogger page")
 }
 
 func ScrapeStreamURL(pageURL string) (*models.VideoMetadata, error) {
+	// Fail closed before any fetch/headless work (SSRF / private hosts).
+	if err := guardScrapeURL(pageURL); err != nil {
+		return nil, err
+	}
+
 	switch detectSitePlatform(pageURL) {
 	case "otakudesu":
 		return scrapeOtakudesu(pageURL)
 	case "anoboy":
-		return scrapeAnoboy(pageURL)
+		metadata, err := scrapeAnoboy(pageURL)
+		if err == nil {
+			return metadata, nil
+		}
+		// Static Blogger resolve failed — try headless network capture
+		log.Printf("Anoboy static scrape failed for %s: %v — trying headless...", pageURL, err)
+		return scrapeWithNanoOrHeadless(pageURL)
 	case "samehadaku":
 		return scrapeSamehadaku(pageURL)
 	case "idlix":
 		// API chain (UUID → gate → claim → majorplay), not DOM/SVG scraping
 		return scrapeIdlix(pageURL)
+	case "sokuja":
+		// Next.js API: /api/video-mirrors?e={episodeId} — no headless
+		metadata, err := scrapeSokuja(pageURL)
+		if err == nil {
+			return metadata, nil
+		}
+		log.Printf("Sokuja static scrape failed for %s: %v — trying headless...", pageURL, err)
+		return scrapeWithNanoOrHeadless(pageURL)
 	default:
 		// Layer 1: static scrape (fast)
 		metadata, err := scrapeGeneric(pageURL)

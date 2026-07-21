@@ -53,7 +53,7 @@
       ref="videoRef"
       id="watch-party-video"
       class="video-el"
-      preload="metadata"
+      preload="auto"
       playsinline
       referrerpolicy="no-referrer"
       @timeupdate="onNativeTimeUpdate"
@@ -290,11 +290,29 @@ function isHlsUrl(url) {
   return clean.endsWith('.m3u8')
 }
 
+function isLikelyHtmlPageUrl(url) {
+  if (!url) return false
+  try {
+    const u = new URL(url)
+    const path = u.pathname.toLowerCase()
+    // Anime episode pages are not playable media
+    if (/\.(mp4|m3u8|webm|mkv|ogg)$/i.test(path)) return false
+    if (u.hostname.includes('youtube') || u.hostname.includes('youtu.be')) return false
+    if (u.hostname.includes('googlevideo') || path.includes('videoplayback')) return false
+    // path looks like a site page (no media extension)
+    return !path.includes('.') || path.endsWith('/') || path.endsWith('.html') || path.endsWith('.php')
+  } catch {
+    return false
+  }
+}
+
 function detectMode(url) {
   if (!url) return null
   if (extractYoutubeId(url)) return 'youtube'
   if (isHlsUrl(url)) return 'hls'
-  return 'native'  // .mp4 or any other direct URL
+  // Refuse to init native player on scraped anime page URLs (HTML)
+  if (isLikelyHtmlPageUrl(url)) return null
+  return 'native'  // .mp4 or other direct media
 }
 
 /* ================================================================
@@ -394,12 +412,38 @@ function stopYtTimePolling() {
 /* ================================================================
    HLS via hls.js
    ================================================================ */
-function getProxiedUrl(url) {
+function sanitizeStreamUrl(url) {
+  if (!url) return url
+  // Guard against residual JSON escapes from scrapers (expire\= … \&ei\=)
+  let s = String(url)
+  s = s.replace(/\\u003d/gi, '=').replace(/\\u0026/gi, '&').replace(/\\u002f/gi, '/')
+  s = s.replace(/\\=/g, '=').replace(/\\&/g, '&').replace(/\\\//g, '/')
+  return s
+}
+
+function getProxiedUrl(url, referer) {
   if (!url) return url
   if (url.startsWith('/api/proxy')) return url
   // Relative URL from hls.js segment — already handled by m3u8 rewriter on backend
   if (!url.startsWith('http')) return url
-  return `/api/proxy?url=${encodeURIComponent(url)}`
+  url = sanitizeStreamUrl(url)
+  let proxied = `/api/proxy?url=${encodeURIComponent(url)}`
+  if (referer) {
+    proxied += `&referer=${encodeURIComponent(referer)}`
+  } else {
+    try {
+      const host = new URL(url).hostname.toLowerCase()
+      // Sokuja progressive MP4 CDN prefers site origin over storage host
+      if (host.includes('sokuja')) {
+        proxied += `&referer=${encodeURIComponent('https://sokuja.uk/')}`
+      }
+      // Blogger / Anoboy streams on googlevideo require blogger referer
+      if (host.includes('googlevideo') || host.includes('googleusercontent') || url.includes('videoplayback')) {
+        proxied += `&referer=${encodeURIComponent('https://www.blogger.com/')}`
+      }
+    } catch (_) { /* ignore */ }
+  }
+  return proxied
 }
 
 function initHls(url) {
@@ -484,6 +528,8 @@ function initNative(url) {
   const vid = videoRef.value
   if (!vid) return
   isLoading.value = true
+  // Progressive MP4 (Sokuja ~80MB+) streams via proxy; Range requests must stay open
+  vid.preload = 'auto'
   vid.src = getProxiedUrl(url)
   vid.load()
 }
@@ -587,10 +633,20 @@ function loadVideo(url) {
   pendingSeekTime.value = null
   streamError.value = null
 
+  url = sanitizeStreamUrl(url)
   const mode = detectMode(url)
   videoMode.value = mode
 
-  if (!mode) return
+  if (!mode) {
+    // Anime page URL still in player state (scrape not applied) — stay idle, no error
+    if (isLikelyHtmlPageUrl(url)) {
+      isLoading.value = false
+      return
+    }
+    streamError.value = 'This video source is not supported.'
+    isLoading.value = false
+    return
+  }
 
   switch (mode) {
     case 'youtube':
@@ -772,7 +828,7 @@ onUnmounted(() => {
   overflow: visible;
   display: flex;
   flex-direction: column;
-  box-shadow: var(--shadow-card), var(--shadow-glow-sm);
+  box-shadow: var(--shadow-card);
 }
 .video-wrapper > .player-container,
 .video-wrapper > .video-el,
@@ -815,7 +871,7 @@ onUnmounted(() => {
   align-items: center;
   justify-content: center;
   gap: var(--space-4);
-  background: radial-gradient(ellipse at center, rgba(255, 46, 147, 0.15) 0%, #000 70%);
+  background: radial-gradient(ellipse at center, rgba(255,255,255,0.04) 0%, #080808 70%);
 }
 .placeholder-icon {
   color: rgba(255,255,255,0.15);
@@ -920,15 +976,15 @@ onUnmounted(() => {
   position: absolute;
   top: 50%; left: 50%;
   transform: translate(-50%, -50%);
-  width: 72px; height: 72px;
+  width: 68px; height: 68px;
   border-radius: 50%;
-  background: rgba(0,0,0,0.6);
-  border: 2px solid rgba(255,255,255,0.3);
+  background: rgba(255,255,255,0.08);
+  border: 1.5px solid rgba(255,255,255,0.2);
   display: flex; align-items: center; justify-content: center;
   cursor: pointer;
   transition: all var(--transition-base);
 }
-.center-play-btn:hover { background: rgba(0,0,0,0.8); transform: translate(-50%,-50%) scale(1.08); }
+.center-play-btn:hover { background: rgba(255,255,255,0.14); transform: translate(-50%,-50%) scale(1.06); }
 .center-play-btn:disabled {
   opacity: 0.5;
   cursor: not-allowed;
@@ -968,7 +1024,7 @@ onUnmounted(() => {
 }
 .progress-fill {
   position: absolute; top: 0; left: 0; height: 100%;
-  background: var(--grad-brand);
+  background: rgba(255,255,255,0.5);
   border-radius: var(--radius-full);
   transition: width 0.1s linear;
   pointer-events: none;
@@ -1015,7 +1071,7 @@ onUnmounted(() => {
 
 .volume-slider {
   width: 80px;
-  accent-color: var(--color-primary);
+  accent-color: rgba(255,255,255,0.5);
   cursor: pointer;
 }
 
@@ -1028,9 +1084,9 @@ onUnmounted(() => {
   font-weight: 700;
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: var(--color-primary);
-  background: hsla(330, 100%, 55%, 0.12);
-  border: 1px solid hsla(330, 100%, 55%, 0.25);
+  color: var(--text-secondary);
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.1);
 }
 
 .guest-indicator {

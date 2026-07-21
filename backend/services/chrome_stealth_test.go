@@ -36,6 +36,17 @@ func TestHighConfidenceStreamURL(t *testing.T) {
 	if highConfidenceStreamURL("https://doubleclick.net/ad.js") {
 		t.Error("ads should not be high confidence")
 	}
+	// Sokuja ad GIFs must NEVER abort headless (false stream success)
+	if highConfidenceStreamURL("https://storages.sokuja.uk/sda/IDKS.gif") {
+		t.Error("sokuja /sda/ gif must not be high confidence")
+	}
+	if highConfidenceStreamURL("https://storages.sokuja.uk/sda/bbb.gif") {
+		t.Error("sokuja ad gif must not be high confidence")
+	}
+	// Real progressive MP4 on storages should match
+	if !highConfidenceStreamURL("https://storages.sokuja.uk/2026-spring/koori-jouheki/SOKUJA.NET-KNJ-10.480p-sdghbwekjgwe.mp4") {
+		t.Error("sokuja progressive mp4 should be high confidence")
+	}
 }
 
 func TestIsAbortSuccess(t *testing.T) {

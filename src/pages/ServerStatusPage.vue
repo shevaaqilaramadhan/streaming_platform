@@ -3,15 +3,9 @@
     <!-- Nav -->
     <nav class="home-nav">
       <router-link to="/" class="nav-logo">
-        <svg width="28" height="28" viewBox="0 0 28 28" fill="none">
-          <circle cx="14" cy="14" r="14" fill="url(#status-logo-grad)"/>
-          <polygon points="11,9 21,14 11,19" fill="white"/>
-          <defs>
-            <linearGradient id="status-logo-grad" x1="0" y1="0" x2="28" y2="28">
-              <stop offset="0%" stop-color="hsl(195,100%,45%)"/>
-              <stop offset="100%" stop-color="hsl(215,90%,50%)"/>
-            </linearGradient>
-          </defs>
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+          <rect x="2" y="2" width="24" height="24" rx="6" fill="#fff" fill-opacity="0.08" stroke="#fff" stroke-width="1.2" stroke-opacity="0.2"/>
+          <polygon points="12,9 21,14 12,19" fill="#fff" fill-opacity="0.7"/>
         </svg>
         <span class="nav-brand">WatchParty</span>
       </router-link>
@@ -416,17 +410,18 @@ function generateUptimeHistory(ratio) {
   padding: 0 var(--space-8);
   height: 56px;
   position: sticky; top: 0; z-index: var(--z-overlay);
-  background: color-mix(in srgb, var(--color-bg-base) 82%, transparent);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border-bottom: 1px solid var(--color-glass-border);
+  background: rgba(10,10,10,0.85);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--color-border);
 }
 .nav-logo {
   display: flex; align-items: center; gap: var(--space-2);
   text-decoration: none;
 }
 .nav-brand {
-  font-size: 1.05rem; font-weight: 700; letter-spacing: -0.02em;
+  color: var(--text-primary);
+  font-size: 0.9375rem; font-weight: 600; letter-spacing: -0.02em;
   color: var(--text-primary);
 }
 .nav-links { display: flex; align-items: center; gap: var(--space-1); margin-left: auto; }
@@ -443,29 +438,29 @@ function generateUptimeHistory(ratio) {
   height: 36px;
   border-radius: var(--radius-sm);
   background: transparent;
-  border: 1px solid var(--color-glass-border);
+  border: 1px solid var(--color-border);
   color: var(--text-secondary);
   cursor: pointer;
   transition: all var(--transition-fast);
 }
 .hamburger-btn:hover {
   color: var(--text-primary);
-  background: var(--color-glass-hover);
+  background: var(--color-fill-hover);
 }
 .nav-link {
   display: inline-flex; align-items: center; gap: 5px;
-  padding: 6px 12px; border-radius: var(--radius-sm);
-  font-size: 0.875rem; font-weight: 500;
+  padding: 6px 14px; border-radius: var(--radius-sm);
+  font-size: 0.8125rem; font-weight: 500;
   color: var(--text-secondary); text-decoration: none;
   transition: all var(--transition-fast);
 }
 .nav-link:hover {
   color: var(--text-primary);
-  background: var(--color-glass-hover);
+  background: var(--color-fill-hover);
 }
 .nav-link.active {
   color: var(--text-primary);
-  background: var(--color-glass-hover);
+  background: var(--color-fill-hover);
 }
 .nav-link svg { opacity: 0.7; }
 .nav-link:hover svg, .nav-link.active svg { opacity: 1; }
@@ -556,7 +551,7 @@ function generateUptimeHistory(ratio) {
   transition: all var(--transition-base);
 }
 .summary-card:hover {
-  background: var(--color-glass-hover);
+  background: var(--color-fill-hover);
   border-color: rgba(255, 255, 255, 0.12);
   transform: translateY(-2px);
 }
@@ -600,7 +595,7 @@ function generateUptimeHistory(ratio) {
   transition: all var(--transition-base);
 }
 .service-card:hover {
-  background: var(--color-glass-hover);
+  background: var(--color-fill-hover);
   border-color: rgba(255, 255, 255, 0.12);
 }
 .service-header {
@@ -659,8 +654,8 @@ function generateUptimeHistory(ratio) {
 .service-metrics {
   display: flex; gap: var(--space-6);
   padding: var(--space-3) 0;
-  border-top: 1px solid var(--color-glass-border);
-  border-bottom: 1px solid var(--color-glass-border);
+  border-top: 1px solid var(--color-border);
+  border-bottom: 1px solid var(--color-border);
   margin-bottom: var(--space-4);
 }
 .metric { display: flex; flex-direction: column; gap: 2px; }
@@ -779,7 +774,7 @@ function generateUptimeHistory(ratio) {
   position: absolute; bottom: calc(100% + 6px);
   left: 50%; transform: translateX(-50%);
   background: rgba(14, 14, 28, 0.95);
-  border: 1px solid var(--color-glass-border);
+  border: 1px solid var(--color-border);
   border-radius: var(--radius-sm);
   padding: 2px 8px;
   font-size: 0.7rem; font-weight: 600;
@@ -837,10 +832,10 @@ function generateUptimeHistory(ratio) {
     flex-direction: column;
     align-items: stretch;
     gap: 0;
-    background: color-mix(in srgb, var(--color-bg-base) 95%, transparent);
+    background: rgba(10,10,10,0.96);
     backdrop-filter: blur(20px);
     -webkit-backdrop-filter: blur(20px);
-    border-bottom: 1px solid var(--color-glass-border);
+    border-bottom: 1px solid var(--color-border);
     padding: var(--space-2) var(--space-4);
     z-index: var(--z-overlay);
   }

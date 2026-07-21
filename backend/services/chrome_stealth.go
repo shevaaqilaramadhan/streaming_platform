@@ -75,6 +75,12 @@ func highConfidenceStreamURL(raw string) bool {
 		return false
 	}
 	lower := strings.ToLower(raw)
+
+	// Ads / tracking / static assets — never abort-on-match (Sokuja /sda/*.gif bug)
+	if isNonMediaAssetURL(lower) {
+		return false
+	}
+
 	// Direct playlists / progressive
 	if strings.Contains(lower, ".m3u8") ||
 		strings.Contains(lower, "master.m3u8") ||
@@ -92,6 +98,7 @@ func highConfidenceStreamURL(raw string) bool {
 			strings.Contains(lower, "vidhide") ||
 			strings.Contains(lower, "mp4upload") ||
 			strings.Contains(lower, "pixeldrain") ||
+			strings.Contains(lower, "storages.sokuja") ||
 			strings.Contains(lower, "/hls/") ||
 			strings.Contains(lower, "/stream/") ||
 			strings.Contains(lower, "/video/") ||
@@ -103,15 +110,44 @@ func highConfidenceStreamURL(raw string) bool {
 			return true
 		}
 	}
-	// Known embed/player hosts used by Samehadaku mirrors
+	// Known embed/player hosts used by Samehadaku / Anoboy / Blogger mirrors
 	hosts := []string{
 		"krakenfiles.com", "acefile.co", "acefile.cc", "hxfile.co",
 		"streamtape.com", "filemoon.", "vidhide", "mp4upload.com",
 		"pixeldrain.com", "luluvdo.com", "vidguard", "dood.",
 		"mixdrop.", "upstream.", "sbplay", "streamsb",
+		"googlevideo.com", "videoplayback", "googleusercontent.com",
+		"acek-cdn.com",
 	}
 	for _, h := range hosts {
 		if strings.Contains(lower, h) {
+			return true
+		}
+	}
+	// storages.sokuja.uk progressive MP4 only (not /sda/ ads — filtered above)
+	if strings.Contains(lower, "storages.sokuja") && strings.Contains(lower, ".mp4") {
+		return true
+	}
+	return false
+}
+
+// isNonMediaAssetURL rejects ad banners, images, fonts that must never be
+// treated as stream URLs (false abort-on-match).
+func isNonMediaAssetURL(lower string) bool {
+	if strings.Contains(lower, "/sda/") || // Sokuja ad folder
+		strings.Contains(lower, "/ads/") ||
+		strings.Contains(lower, "doubleclick") ||
+		strings.Contains(lower, "googlesyndication") {
+		return true
+	}
+	// Image / font extensions (including .gif ads on storages.sokuja.uk)
+	for _, ext := range []string{".gif", ".png", ".jpg", ".jpeg", ".webp", ".svg", ".ico",
+		".woff", ".woff2", ".ttf", ".otf", ".css", ".map"} {
+		if strings.Contains(lower, ext) {
+			// allow .mp4 even if path has something else
+			if strings.Contains(lower, ".mp4") || strings.Contains(lower, ".m3u8") {
+				continue
+			}
 			return true
 		}
 	}
