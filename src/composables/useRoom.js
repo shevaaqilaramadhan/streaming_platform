@@ -52,7 +52,9 @@ export function isDirectPlayableUrl(url) {
   // Direct media extensions (ignore query string)
   try {
     const path = new URL(u).pathname.toLowerCase()
-    return /\.(mp4|m3u8|webm|mkv|ogg)$/i.test(path)
+    if (/\.(mp4|m3u8|webm|mkv|ogg)$/i.test(path)) return true
+    if (/mega\.nz\/embed|blogger\.com\/video|blogspot\.com\/video|play\.xtwap\.top/i.test(u)) return true
+    return false
   } catch {
     return false
   }

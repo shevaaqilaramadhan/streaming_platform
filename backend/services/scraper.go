@@ -118,6 +118,19 @@ func copyVideoMetadata(m *models.VideoMetadata) *models.VideoMetadata {
 
 // isPlayableStreamURL reports whether u looks like a real media stream
 // (not an anime episode HTML page). Used to reject bad scrape results / cache.
+func isEmbedPlayerURL(u string) bool {
+	lower := strings.ToLower(strings.TrimSpace(u))
+	if lower == "" {
+		return false
+	}
+	return strings.Contains(lower, "mega.nz/embed") ||
+		strings.Contains(lower, "blogger.com/video") ||
+		strings.Contains(lower, "blogspot.com/video") ||
+		strings.Contains(lower, "play.xtwap.top") ||
+		strings.Contains(lower, "/embed/") ||
+		strings.Contains(lower, "player.php")
+}
+
 func isPlayableStreamURL(u string) bool {
 	u = strings.TrimSpace(u)
 	if u == "" {
@@ -125,6 +138,9 @@ func isPlayableStreamURL(u string) bool {
 	}
 	lower := strings.ToLower(u)
 	if strings.Contains(lower, "googlevideo.com") || strings.Contains(lower, "videoplayback") {
+		return true
+	}
+	if isEmbedPlayerURL(u) {
 		return true
 	}
 	parsed, err := url.Parse(u)
@@ -822,6 +838,33 @@ func scrapeOtakudesu(pageURL string) (*models.VideoMetadata, error) {
 //
 // The scraper tries each mirror (base64-decoded) and extracts the actual video
 // URL from the Blogger video page using extractBloggerVideoURL.
+type anoboyCandidate struct {
+	label string
+	url   string
+	score int
+}
+
+func scoreAnoboyCandidate(label, rawURL string) int {
+	l := strings.ToLower(label)
+	u := strings.ToLower(rawURL)
+	score := 0
+	if strings.Contains(u, "xtwap") || strings.Contains(u, "hls") {
+		score += 500 // Known fast HLS provider
+	}
+	if strings.Contains(u, ".m3u8") || strings.Contains(u, ".mp4") {
+		score += 450
+	}
+	if strings.Contains(l, "hd-2") || strings.Contains(l, "hd-3") {
+		score += 350
+	} else if strings.Contains(l, "hd-1") {
+		score += 200
+	}
+	if strings.Contains(u, "blogger") || strings.Contains(u, "blogspot") {
+		score += 50
+	}
+	return score
+}
+
 func scrapeAnoboy(pageURL string) (*models.VideoMetadata, error) {
 	doc, err := fetchPageDocument(pageURL, "")
 	if err != nil {
@@ -829,83 +872,122 @@ func scrapeAnoboy(pageURL string) (*models.VideoMetadata, error) {
 	}
 
 	html, _ := doc.Html()
+	metadata := extractAnoboyMetadata(doc, pageURL)
 
-	// Layer 1: Try direct iframe in page (Blogger video embed).
-	directIframeSrc := ""
-	doc.Find(".player-embed iframe, #pembed iframe, .video-content iframe").Each(func(_ int, s *goquery.Selection) {
-		if src, exists := s.Attr("src"); exists && src != "" && directIframeSrc == "" {
-			directIframeSrc = normalizeURL(src, pageURL)
+	var candidates []anoboyCandidate
+	seen := make(map[string]bool)
+
+	addCandidate := func(label, rawURL string) {
+		rawURL = strings.TrimSpace(rawURL)
+		if rawURL == "" || rawURL == "about:blank" || seen[rawURL] {
+			return
 		}
-	})
-
-	if directIframeSrc == "" {
-		// Fallback: any iframe in the page
-		doc.Find("iframe").Each(func(_ int, s *goquery.Selection) {
-			if src, exists := s.Attr("src"); exists && src != "" && directIframeSrc == "" {
-				directIframeSrc = normalizeURL(src, pageURL)
-			}
+		seen[rawURL] = true
+		normalized := normalizeURL(rawURL, pageURL)
+		candidates = append(candidates, anoboyCandidate{
+			label: label,
+			url:   normalized,
+			score: scoreAnoboyCandidate(label, normalized),
 		})
 	}
 
-	if directIframeSrc != "" {
-		videoURL, err := resolveEmbedURL(directIframeSrc, pageURL)
-		if err == nil && videoURL != "" {
-			metadata := extractAnoboyMetadata(doc, pageURL)
-			metadata.VideoURL = videoURL
-			return metadata, nil
+	// Layer 1: Modern Anoboy player panel buttons (.aspd-server)
+	doc.Find(".aspd-server, [class*='aspd-server']").Each(func(_ int, s *goquery.Selection) {
+		label := strings.TrimSpace(s.AttrOr("data-label", ""))
+		if label == "" {
+			label = strings.TrimSpace(s.Text())
 		}
-	}
+		if u := s.AttrOr("data-url", ""); u != "" {
+			addCandidate(label, u)
+		}
+		if embedB64 := s.AttrOr("data-embed", ""); embedB64 != "" {
+			if decoded, err := base64.StdEncoding.DecodeString(embedB64); err == nil {
+				if m := iframeRegex.FindStringSubmatch(string(decoded)); len(m) > 1 {
+					addCandidate(label, m[1])
+				}
+			}
+		}
+	})
 
-	// Layer 2: Parse mirror dropdown options (base64-encoded iframe HTML).
-	// Pattern: <select class="mirror">...<option value="BASE64_IFRAME_HTML" data-index="1">...</option></select>
+	// Layer 2: Direct iframe on page (including LiteSpeed lazy-loaded attributes)
+	doc.Find(".player-embed iframe, #pembed iframe, .video-content iframe, iframe").Each(func(_ int, s *goquery.Selection) {
+		if src, exists := s.Attr("data-litespeed-src"); exists && src != "" {
+			addCandidate("Direct LiteSpeed Iframe", src)
+		}
+		if src, exists := s.Attr("data-src"); exists && src != "" {
+			addCandidate("Direct Data-Src Iframe", src)
+		}
+		if src, exists := s.Attr("src"); exists && src != "" {
+			addCandidate("Direct Iframe", src)
+		}
+	})
+
+	// Layer 3: Legacy mirror dropdown options (base64-encoded iframe HTML)
 	mirrorOptionRegex := regexp.MustCompile(`<option\s+value="([A-Za-z0-9+/=]{20,})"`)
-	mirrorMatches := mirrorOptionRegex.FindAllStringSubmatch(html, -1)
-
-	for _, m := range mirrorMatches {
-		b64Value := m[1]
-		decoded, err := base64.StdEncoding.DecodeString(b64Value)
-		if err != nil {
-			continue
-		}
-
-		// The decoded value is an <iframe src="..."> tag.
-		decodedStr := string(decoded)
-		iframeSrcMatch := iframeRegex.FindStringSubmatch(decodedStr)
-		if len(iframeSrcMatch) < 2 {
-			continue
-		}
-
-		iframeSrc := normalizeURL(iframeSrcMatch[1], pageURL)
-
-		videoURL, err := resolveEmbedURL(iframeSrc, pageURL)
-		if err == nil && videoURL != "" {
-			metadata := extractAnoboyMetadata(doc, pageURL)
-			metadata.VideoURL = videoURL
-			return metadata, nil
+	for _, m := range mirrorOptionRegex.FindAllStringSubmatch(html, -1) {
+		if decoded, err := base64.StdEncoding.DecodeString(m[1]); err == nil {
+			if iframeMatch := iframeRegex.FindStringSubmatch(string(decoded)); len(iframeMatch) > 1 {
+				addCandidate("Legacy Mirror Option", iframeMatch[1])
+			}
 		}
 	}
 
-	// Layer 3: Deep search for any iframes in the page (catch-all).
-	iframeSrcs := extractIframeSrcs(html)
-	for _, iframeSrc := range iframeSrcs {
-		iframeSrc = normalizeURL(iframeSrc, pageURL)
-		videoURL, err := resolveEmbedURL(iframeSrc, pageURL)
-		if err == nil && videoURL != "" {
-			metadata := extractAnoboyMetadata(doc, pageURL)
-			metadata.VideoURL = videoURL
-			return metadata, nil
+	// Sort candidates: prioritize direct HLS providers (like xtwap HD-2) first
+	sort.SliceStable(candidates, func(i, j int) bool {
+		return candidates[i].score > candidates[j].score
+	})
+
+	log.Printf("[Anoboy] found %d candidates for %s", len(candidates), pageURL)
+	for i, c := range candidates {
+		if i < 6 {
+			log.Printf("[Anoboy]   #%d [%s] score=%d → %s", i+1, c.label, c.score, truncateURL(c.url, 90))
 		}
 	}
 
-	return nil, fmt.Errorf("could not find stream URL from %s", pageURL)
+	var fallbackEmbed string
+	for _, c := range candidates {
+		videoURL, err := resolveEmbedURL(c.url, pageURL)
+		if err == nil && videoURL != "" {
+			// Prioritize direct playable stream URL (.m3u8 or .mp4)
+			if isDirectStreamURL(videoURL) {
+				metadata.VideoURL = videoURL
+				metadata.Source = "anoboy"
+				RegisterStreamMetadata(metadata.VideoURL, metadata.ThumbnailURL)
+				RegisterStreamURLs(c.url)
+				RegisterStreamURLs(videoURL)
+				log.Printf("[Anoboy] SUCCESS direct stream via %q → %s", c.label, truncateURL(videoURL, 100))
+				return metadata, nil
+			}
+			if fallbackEmbed == "" && isPlayableStreamURL(videoURL) {
+				fallbackEmbed = videoURL
+			}
+		}
+		if fallbackEmbed == "" && (isEmbedPlayerURL(c.url) || isBloggerVideoURL(c.url)) {
+			fallbackEmbed = c.url
+		}
+	}
+
+	if fallbackEmbed != "" {
+		metadata.VideoURL = fallbackEmbed
+		metadata.Source = "anoboy"
+		RegisterStreamMetadata(metadata.VideoURL, metadata.ThumbnailURL)
+		RegisterStreamURLs(fallbackEmbed)
+		log.Printf("[Anoboy] SUCCESS fallback embed → %s", truncateURL(fallbackEmbed, 100))
+		return metadata, nil
+	}
+
+	return nil, fmt.Errorf("could not find playable stream URL from %s", pageURL)
 }
 
 // resolveEmbedURL takes an iframe/embed URL and tries to resolve it to a
 // direct video stream URL. It handles Blogger video pages specially.
 func resolveEmbedURL(embedURL, referer string) (string, error) {
-	// If it's a Blogger video page, use the dedicated extractor.
+	// If it's a Blogger video page, try dedicated extractor, fallback to embed URL
 	if isBloggerVideoURL(embedURL) {
-		return extractBloggerVideoURL(embedURL, referer)
+		if videoURL, err := extractBloggerVideoURL(embedURL, referer); err == nil && isPlayableStreamURL(videoURL) {
+			return videoURL, nil
+		}
+		return embedURL, nil
 	}
 
 	// For other embed URLs, fetch and search for stream URLs.

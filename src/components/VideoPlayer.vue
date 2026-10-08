@@ -1,5 +1,5 @@
 <template>
-  <div ref="wrapperRef" class="video-wrapper" :class="{ 'is-loading': isLoading }">
+  <div ref="wrapperRef" class="video-wrapper" :class="{ 'is-loading': isLoading, 'is-iframe': videoMode === 'iframe' }">
     <!-- Loading overlay -->
     <Transition name="fade">
       <div v-if="isLoading && videoUrl" class="video-loading">
@@ -47,9 +47,22 @@
       <div id="youtube-player"></div>
     </div>
 
+    <!-- Generic Embed iframe container (Blogger, Mega, xtwap, etc.) -->
+    <div v-if="videoUrl && videoMode === 'iframe'" class="player-container iframe-container">
+      <iframe
+        ref="iframeRef"
+        :src="videoUrl"
+        class="embed-iframe"
+        allow="autoplay; fullscreen; encrypted-media; picture-in-picture"
+        allowfullscreen
+        referrerpolicy="no-referrer"
+        @load="onIframeLoad"
+      ></iframe>
+    </div>
+
     <!-- Native HTML5 video element (for HLS & MP4) -->
     <video
-      v-show="videoUrl && videoMode !== 'youtube'"
+      v-show="videoUrl && videoMode !== 'youtube' && videoMode !== 'iframe'"
       ref="videoRef"
       id="watch-party-video"
       class="video-el"
@@ -409,6 +422,7 @@ const progressPercent = computed(() => {
 const streamTooltip = computed(() => {
   if (videoMode.value === 'youtube') return 'YouTube IFrame Player'
   if (videoMode.value === 'hls') return 'HLS stream via hls.js'
+  if (videoMode.value === 'iframe') return 'Embedded Player'
   return 'Native HTML5 video'
 })
 
@@ -430,11 +444,25 @@ function isHlsUrl(url) {
   return clean.endsWith('.m3u8')
 }
 
+function isEmbedUrl(url) {
+  if (!url) return false
+  const lower = String(url).toLowerCase()
+  return lower.includes('blogger.com/video') ||
+    lower.includes('blogspot.com/video') ||
+    lower.includes('mega.nz/embed') ||
+    lower.includes('play.xtwap.top') ||
+    lower.includes('/embed/') ||
+    lower.includes('embed.php') ||
+    lower.includes('player.php')
+}
+
 function isLikelyHtmlPageUrl(url) {
   if (!url) return false
   try {
     const u = new URL(url)
     const path = u.pathname.toLowerCase()
+    // Embed URLs are handled via iframe player
+    if (isEmbedUrl(url)) return false
     // Anime episode pages are not playable media
     if (/\.(mp4|m3u8|webm|mkv|ogg)$/i.test(path)) return false
     if (u.hostname.includes('youtube') || u.hostname.includes('youtu.be')) return false
@@ -450,6 +478,7 @@ function detectMode(url) {
   if (!url) return null
   if (extractYoutubeId(url)) return 'youtube'
   if (isHlsUrl(url)) return 'hls'
+  if (isEmbedUrl(url)) return 'iframe'
   // Refuse to init native player on scraped anime page URLs (HTML)
   if (isLikelyHtmlPageUrl(url)) return null
   return 'native'  // .mp4 or other direct media
@@ -738,6 +767,16 @@ function onNativeEnded() {
 function onNativeError() {
   const vid = videoRef.value
   const code = vid?.error?.code
+  // If native player fails with code 4 (unsupported format) and URL could be an embed:
+  if (code === 4 && props.videoUrl) {
+    const raw = String(props.videoUrl).toLowerCase()
+    if (isEmbedUrl(props.videoUrl) || raw.includes('video.g') || raw.includes('blogger') || raw.includes('mega.nz')) {
+      console.info('[Stream] Falling back to embedded iframe player')
+      videoMode.value = 'iframe'
+      isLoading.value = true
+      return
+    }
+  }
   const messages = {
     1: 'Video playback was aborted.',
     2: 'A network error occurred while loading the video.',
@@ -747,6 +786,11 @@ function onNativeError() {
   streamError.value = messages[code] || 'An unknown error occurred while loading the video.'
   isLoading.value = false
   emit('error', streamError.value)
+}
+
+function onIframeLoad() {
+  isLoading.value = false
+  streamError.value = null
 }
 
 function clearErrorAndFocus() {
@@ -806,6 +850,9 @@ function loadVideo(url) {
       break
     case 'hls':
       initHls(url)
+      break
+    case 'iframe':
+      isLoading.value = true
       break
     case 'native':
       initNative(url)
@@ -1028,11 +1075,22 @@ onUnmounted(() => {
   aspect-ratio: 16 / 9;
   background: #000;
 }
-.player-container :deep(iframe) {
+.player-container :deep(iframe),
+.embed-iframe {
   width: 100% !important;
   height: 100% !important;
   display: block;
   border: none;
+}
+.video-wrapper.is-iframe .controls-overlay {
+  pointer-events: none;
+}
+.video-wrapper.is-iframe .controls-bar {
+  pointer-events: auto;
+}
+.video-wrapper.is-iframe .center-play-btn,
+.video-wrapper.is-iframe .progress-container {
+  display: none;
 }
 
 /* Native video element */

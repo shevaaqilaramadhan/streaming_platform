@@ -37,86 +37,98 @@ var (
 )
 
 type samehaMirror struct {
-	PostID int
-	Nume   int
-	Type   string
-	Label  string
-	Score  int // higher = preferred
+	PostID    int
+	Nume      int
+	Type      string
+	Label     string
+	Score     int // higher = preferred
+	IframeSrc string
 }
 
-func scoreSamehaMirror(label string) int {
+func scoreSamehaMirror(label, iframeSrc string) int {
 	l := strings.ToLower(label)
 	score := 0
-	// Prefer direct progressive/host streams over blogger when possible
+	// Prefer higher resolution streams
 	if strings.Contains(l, "1080") {
-		score += 300
+		score += 350
 	} else if strings.Contains(l, "720") {
-		score += 200
+		score += 250
 	} else if strings.Contains(l, "480") {
-		score += 100
+		score += 150
 	}
 	if strings.Contains(l, "wibufile") {
-		score += 50 // direct mp4 host — works well with proxy
+		score += 80 // direct mp4 host
+	}
+	if strings.Contains(l, "mega") || strings.Contains(strings.ToLower(iframeSrc), "mega.nz") {
+		score += 180 // Mega embeds are fast and reliable
 	}
 	if strings.Contains(l, "blogspot") || strings.Contains(l, "blogger") {
-		score += 40
+		score += 50
 	}
 	if strings.Contains(l, "vip") {
 		score += 20
 	}
-	if strings.Contains(l, "mega") {
-		score -= 10 // often download-only / not embed-friendly
-	}
 	return score
 }
 
-func parseSamehaPlayerOptions(html string) []samehaMirror {
+func parseSamehaPlayerOptions(htmlText string) []samehaMirror {
 	seen := make(map[string]bool)
 	var out []samehaMirror
 
-	add := func(post, nume, typ, label string) {
+	add := func(post, nume, typ, label, iframeSrc string) {
 		pid, _ := strconv.Atoi(post)
 		n, _ := strconv.Atoi(nume)
-		if pid == 0 || n == 0 {
+		if pid == 0 && n == 0 && iframeSrc == "" {
 			return
 		}
-		key := fmt.Sprintf("%d:%d:%s", pid, n, typ)
+		key := fmt.Sprintf("%d:%d:%s:%s", pid, n, typ, iframeSrc)
 		if seen[key] {
 			return
 		}
 		seen[key] = true
 		label = strings.TrimSpace(label)
 		out = append(out, samehaMirror{
-			PostID: pid,
-			Nume:   n,
-			Type:   typ,
-			Label:  label,
-			Score:  scoreSamehaMirror(label),
+			PostID:    pid,
+			Nume:      n,
+			Type:      typ,
+			Label:     label,
+			Score:     scoreSamehaMirror(label, iframeSrc),
+			IframeSrc: iframeSrc,
 		})
 	}
 
-	for _, re := range []*regexp.Regexp{samehaPlayerOptionRe, samehaPlayerOptionRe2} {
-		for _, m := range re.FindAllStringSubmatch(html, -1) {
-			if len(m) >= 5 {
-				add(m[1], m[2], m[3], m[4])
+	doc, docErr := goquery.NewDocumentFromReader(strings.NewReader(htmlText))
+	if docErr == nil {
+		doc.Find(".east_player_option, [class*='east_player_option']").Each(func(_ int, s *goquery.Selection) {
+			post, _ := s.Attr("data-post")
+			nume, _ := s.Attr("data-nume")
+			typ, _ := s.Attr("data-type")
+			label := strings.TrimSpace(s.Find("span").First().Text())
+			if label == "" {
+				label = strings.TrimSpace(s.Text())
 			}
-		}
+			iframeSrc := ""
+			if rawEmbed, exists := s.Attr("data-embed"); exists && rawEmbed != "" {
+				if m := samehaIframeSrcRe.FindStringSubmatch(rawEmbed); len(m) > 1 {
+					iframeSrc = m[1]
+				}
+			}
+			if iframeSrc == "" {
+				if u, exists := s.Attr("data-url"); exists && u != "" {
+					iframeSrc = u
+				}
+			}
+			add(post, nume, typ, label, iframeSrc)
+		})
 	}
 
-	// goquery fallback
 	if len(out) == 0 {
-		doc, err := goquery.NewDocumentFromReader(strings.NewReader(html))
-		if err == nil {
-			doc.Find(".east_player_option, [class*='east_player_option']").Each(func(_ int, s *goquery.Selection) {
-				post, _ := s.Attr("data-post")
-				nume, _ := s.Attr("data-nume")
-				typ, _ := s.Attr("data-type")
-				label := strings.TrimSpace(s.Find("span").First().Text())
-				if label == "" {
-					label = strings.TrimSpace(s.Text())
+		for _, re := range []*regexp.Regexp{samehaPlayerOptionRe, samehaPlayerOptionRe2} {
+			for _, m := range re.FindAllStringSubmatch(htmlText, -1) {
+				if len(m) >= 5 {
+					add(m[1], m[2], m[3], m[4], "")
 				}
-				add(post, nume, typ, label)
-			})
+			}
 		}
 	}
 
@@ -221,9 +233,19 @@ func resolveSamehaEmbed(embedURL, pageURL string) (string, error) {
 		return embedURL, nil
 	}
 
+	// Mega embed video player
+	if strings.Contains(lower, "mega.nz/embed") {
+		return embedURL, nil
+	}
+
 	// Blogger video player
 	if isBloggerVideoURL(embedURL) {
-		return extractBloggerVideoURL(embedURL, pageURL)
+		s, err := extractBloggerVideoURL(embedURL, pageURL)
+		if err == nil && isPlayableStreamURL(s) {
+			return s, nil
+		}
+		// If direct googlevideo extraction fails or is 403, return the Blogger embed player itself
+		return embedURL, nil
 	}
 
 	// Generic: fetch embed page and search for stream
@@ -322,24 +344,29 @@ func scrapeSamehadaku(pageURL string) (*models.VideoMetadata, error) {
 
 	for i := 0; i < maxTry; i++ {
 		m := mirrors[i]
-		log.Printf("[Samehadaku] Trying mirror %q (nume=%d)…", m.Label, m.Nume)
+		log.Printf("[Samehadaku] Trying mirror %q (nume=%d, hasIframeSrc=%t)…", m.Label, m.Nume, m.IframeSrc != "")
 
-		embed, err := fetchSamehaPlayerEmbed(ajaxURL, pageURL, m)
-		if err != nil {
-			lastErr = err
-			log.Printf("[Samehadaku] player_ajax failed for nume=%d: %v", m.Nume, err)
-			continue
+		embed := m.IframeSrc
+		if embed == "" {
+			var err error
+			embed, err = fetchSamehaPlayerEmbed(ajaxURL, pageURL, m)
+			if err != nil {
+				lastErr = err
+				log.Printf("[Samehadaku] player_ajax failed for nume=%d: %v", m.Nume, err)
+				continue
+			}
 		}
 		log.Printf("[Samehadaku] embed: %s", truncateURL(embed, 100))
 
 		streamURL, err := resolveSamehaEmbed(embed, pageURL)
-		if err != nil {
-			lastErr = err
-			log.Printf("[Samehadaku] resolve embed failed: %v", err)
-			// Still try using raw embed if it looks like media
-			if strings.Contains(strings.ToLower(embed), ".mp4") || strings.Contains(strings.ToLower(embed), ".m3u8") {
+		if err != nil || !isPlayableStreamURL(streamURL) {
+			if strings.Contains(strings.ToLower(embed), "mega.nz/embed") || isBloggerVideoURL(embed) {
 				streamURL = embed
 			} else {
+				if err != nil {
+					lastErr = err
+				}
+				log.Printf("[Samehadaku] resolve embed failed: %v", err)
 				continue
 			}
 		}

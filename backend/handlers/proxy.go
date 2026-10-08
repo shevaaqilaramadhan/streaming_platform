@@ -84,7 +84,7 @@ var (
 		"krakenfiles.com", "pixeldrain.com", "fembed.com", "vanfem.com",
 		"cybervynx.com", "rabbitstream.net", "megacloud.tv", "rapid-cloud.com",
 		"shadowlandschronicles.com", "dokicloud.one", "cloudnestra.com",
-		"wibufile.com", "mega.nz",
+		"wibufile.com", "mega.nz", "xtwap.top", "play.xtwap.top", "hls.xtwap.top",
 		"youtube.com", "youtu.be", "ytimg.com", "vimeo.com",
 		"tmdb.org", "themoviedb.org", "image.tmdb.org",
 	}
@@ -257,6 +257,10 @@ func defaultProxyReferer(u *url.URL) string {
 	// Blogger / Anoboy progressive streams live on googlevideo.com
 	if strings.Contains(host, "googlevideo") || strings.Contains(host, "googleusercontent") {
 		return "https://www.blogger.com/"
+	}
+	// xtwap HLS streaming requires play.xtwap.top referer
+	if strings.Contains(host, "xtwap") {
+		return "https://play.xtwap.top/"
 	}
 	return u.Scheme + "://" + u.Host + "/"
 }
