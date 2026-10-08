@@ -422,7 +422,7 @@ func scrapeIdlixHTTP(p *idlixParsedURL) (*models.VideoMetadata, error) {
 		}
 	}
 
-	meta = &models.VideoMetadata{
+	meta := &models.VideoMetadata{
 		VideoURL: streamURL,
 		Title:    title,
 		Source:   "idlix",
