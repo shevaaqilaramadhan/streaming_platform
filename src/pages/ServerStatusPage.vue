@@ -208,8 +208,11 @@
             <p>Get notified when services experience downtime or degraded performance.</p>
           </div>
         </div>
-        <button class="btn btn-primary" @click="subscribed = !subscribed">
-          {{ subscribed ? '✓ Subscribed' : 'Subscribe' }}
+        <button class="btn btn-primary" :class="{ 'btn-secondary': subscribed }" @click="subscribed = !subscribed">
+          <svg v-if="subscribed" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="margin-right: 6px;">
+            <polyline points="20 6 9 17 4 12"/>
+          </svg>
+          {{ subscribed ? 'Subscribed' : 'Subscribe' }}
         </button>
       </div>
     </div>
@@ -541,26 +544,17 @@ function generateUptimeHistory(ratio) {
 }
 .status-dot {
   width: 8px; height: 8px; border-radius: 50%;
+  flex-shrink: 0;
 }
 .status-dot.operational {
   background: var(--color-accent-green);
-  box-shadow: 0 0 8px var(--color-accent-green);
-  animation: pulse-green 2s infinite;
 }
 .status-dot.degraded {
   background: var(--color-accent-amber);
-  box-shadow: 0 0 8px var(--color-accent-amber);
-  animation: pulse-amber 2s infinite;
 }
 .status-dot.down {
   background: var(--color-accent-red);
-  box-shadow: 0 0 8px var(--color-accent-red);
-  animation: pulse-red 2s infinite;
 }
-
-@keyframes pulse-green { 0%, 100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.4); } 50% { box-shadow: 0 0 0 6px rgba(16, 185, 129, 0); } }
-@keyframes pulse-amber { 0%, 100% { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.4); } 50% { box-shadow: 0 0 0 6px rgba(245, 158, 11, 0); } }
-@keyframes pulse-red { 0%, 100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.4); } 50% { box-shadow: 0 0 0 6px rgba(239, 68, 68, 0); } }
 
 .status-hero-title {
   font-size: clamp(2rem, 4vw, 3rem);

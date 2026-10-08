@@ -603,17 +603,11 @@ const steps = [
   overflow: hidden;
   transition: border-color var(--transition-slow), box-shadow var(--transition-slow);
   background: var(--color-bg-surface);
-  animation: hero-float 6s ease-in-out infinite;
   width: 100%;
 }
 .hero-preview:hover {
   border-color: var(--color-border-strong);
   box-shadow: 0 20px 50px rgba(0, 0, 0, 0.45);
-}
-
-@keyframes hero-float {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-6px); }
 }
 
 /* Browser chrome */
@@ -801,14 +795,9 @@ const steps = [
   border-radius: 1px;
   background: var(--text-primary);
 }
-.bar-1 { height: 60%; animation: mock-eq 1.2s ease infinite alternate; }
-.bar-2 { height: 100%; animation: mock-eq 0.8s ease infinite alternate 0.2s; }
-.bar-3 { height: 40%; animation: mock-eq 1s ease infinite alternate 0.4s; }
-
-@keyframes mock-eq {
-  0% { height: 20%; }
-  100% { height: 100%; }
-}
+.bar-1 { height: 60%; }
+.bar-2 { height: 100%; }
+.bar-3 { height: 40%; }
 
 .mock-controls {
   height: 30px;
@@ -895,7 +884,6 @@ const steps = [
   align-items: flex-end;
   gap: var(--space-2);
   max-width: 92%;
-  animation: float-bubble 4s ease-in-out infinite alternate;
 }
 .mock-msg.sender-other { align-self: flex-start; }
 .mock-msg.sender-self {
@@ -949,11 +937,6 @@ const steps = [
 }
 .sender-self .mock-msg-text {
   color: var(--text-primary);
-}
-
-@keyframes float-bubble {
-  0% { transform: translateY(0); }
-  100% { transform: translateY(-3px); }
 }
 
 .mock-chat-input {

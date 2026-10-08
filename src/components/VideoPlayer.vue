@@ -1057,7 +1057,6 @@ onUnmounted(() => {
 }
 .placeholder-icon {
   color: rgba(255,255,255,0.15);
-  animation: float 4s ease-in-out infinite;
 }
 .placeholder-text {
   color: var(--text-muted);
