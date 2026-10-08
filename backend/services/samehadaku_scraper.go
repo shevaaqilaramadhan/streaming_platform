@@ -48,6 +48,7 @@ type samehaMirror struct {
 
 func scoreSamehaMirror(label, iframeSrc string) int {
 	l := strings.ToLower(label)
+	u := strings.ToLower(iframeSrc)
 	score := 0
 	// Prefer higher resolution streams
 	if strings.Contains(l, "1080") {
@@ -58,13 +59,14 @@ func scoreSamehaMirror(label, iframeSrc string) int {
 		score += 150
 	}
 	if strings.Contains(l, "wibufile") {
-		score += 80 // direct mp4 host
+		score += 120 // direct mp4 host
 	}
-	if strings.Contains(l, "mega") || strings.Contains(strings.ToLower(iframeSrc), "mega.nz") {
-		score += 180 // Mega embeds are fast and reliable
+	if strings.Contains(l, "blogspot") || strings.Contains(l, "blogger") || strings.Contains(u, "blogger.com") {
+		score += 300 // Working video player
 	}
-	if strings.Contains(l, "blogspot") || strings.Contains(l, "blogger") {
-		score += 50
+	// Mega mirrors on Samehadaku are routinely DMCA blocked / -16 EBLOCKED
+	if strings.Contains(l, "mega") || strings.Contains(u, "mega.nz") {
+		score -= 500
 	}
 	if strings.Contains(l, "vip") {
 		score += 20
