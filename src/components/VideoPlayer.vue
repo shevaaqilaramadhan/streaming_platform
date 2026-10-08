@@ -54,7 +54,6 @@
         :src="videoUrl"
         class="embed-iframe"
         allow="autoplay; fullscreen; encrypted-media; picture-in-picture"
-        allowfullscreen
         referrerpolicy="no-referrer"
         @load="onIframeLoad"
       ></iframe>

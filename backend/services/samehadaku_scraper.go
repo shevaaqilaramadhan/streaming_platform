@@ -2,6 +2,7 @@ package services
 
 import (
 	"fmt"
+	"html"
 	"io"
 	"log"
 	"net/http"
@@ -109,7 +110,10 @@ func parseSamehaPlayerOptions(htmlText string) []samehaMirror {
 			}
 			iframeSrc := ""
 			if rawEmbed, exists := s.Attr("data-embed"); exists && rawEmbed != "" {
-				if m := samehaIframeSrcRe.FindStringSubmatch(rawEmbed); len(m) > 1 {
+				unescaped := html.UnescapeString(rawEmbed)
+				if m := samehaIframeSrcRe.FindStringSubmatch(unescaped); len(m) > 1 {
+					iframeSrc = m[1]
+				} else if m := samehaIframeSrcRe.FindStringSubmatch(rawEmbed); len(m) > 1 {
 					iframeSrc = m[1]
 				}
 			}
@@ -291,7 +295,70 @@ func scrapeSamehadaku(pageURL string) (*models.VideoMetadata, error) {
 		return scrapeSamehadakuFallback(pageURL)
 	}
 
-	// Layer 0: Check for direct iframe in page (e.g. Blogger / Blogspot embed already rendered)
+	mirrors := parseSamehaPlayerOptions(html)
+	if len(mirrors) > 0 {
+		log.Printf("[Samehadaku] found %d player mirrors (best first)", len(mirrors))
+		for i, m := range mirrors {
+			if i < 8 {
+				log.Printf("[Samehadaku]   #%d post=%d nume=%d label=%q score=%d iframe=%t", i+1, m.PostID, m.Nume, m.Label, m.Score, m.IframeSrc != "")
+			}
+		}
+
+		ajaxURL := samehaAjaxURL(pageURL)
+		var lastErr error
+		maxTry := 6
+		if len(mirrors) < maxTry {
+			maxTry = len(mirrors)
+		}
+
+		for i := 0; i < maxTry; i++ {
+			m := mirrors[i]
+			log.Printf("[Samehadaku] Trying mirror %q (nume=%d, hasIframeSrc=%t)…", m.Label, m.Nume, m.IframeSrc != "")
+
+			embed := m.IframeSrc
+			if embed == "" {
+				var err error
+				embed, err = fetchSamehaPlayerEmbed(ajaxURL, pageURL, m)
+				if err != nil {
+					lastErr = err
+					log.Printf("[Samehadaku] player_ajax failed for nume=%d: %v", m.Nume, err)
+					continue
+				}
+			}
+			log.Printf("[Samehadaku] embed: %s", truncateURL(embed, 100))
+
+			streamURL, err := resolveSamehaEmbed(embed, pageURL)
+			if err != nil || !isPlayableStreamURL(streamURL) {
+				if strings.Contains(strings.ToLower(embed), "mega.nz/embed") || isBloggerVideoURL(embed) {
+					streamURL = embed
+				} else {
+					if err != nil {
+						lastErr = err
+					}
+					log.Printf("[Samehadaku] resolve embed failed: %v", err)
+					continue
+				}
+			}
+
+			meta := extractSamehaMetadata(html, pageURL)
+			meta.VideoURL = streamURL
+			meta.Source = "samehadaku"
+			if meta.Title == "" {
+				meta.Title = m.Label
+			}
+			if meta.Episode == "" && m.Label != "" {
+				meta.Episode = m.Label
+			}
+
+			RegisterStreamMetadata(meta.VideoURL, meta.ThumbnailURL)
+			RegisterStreamURLs(embed)
+			log.Printf("[Samehadaku] SUCCESS via %q → %s", m.Label, truncateURL(streamURL, 100))
+			return meta, nil
+		}
+		log.Printf("[Samehadaku] all %d mirrors failed (last=%v) — trying page fallback", len(mirrors), lastErr)
+	}
+
+	// Layer 2: Check for direct iframe in page (e.g. Blogger / Blogspot embed already rendered)
 	doc, docErr := goquery.NewDocumentFromReader(strings.NewReader(html))
 	if docErr == nil {
 		directIframeSrc := ""
@@ -321,74 +388,6 @@ func scrapeSamehadaku(pageURL string) (*models.VideoMetadata, error) {
 		}
 	}
 
-	mirrors := parseSamehaPlayerOptions(html)
-	if len(mirrors) == 0 {
-		log.Printf("[Samehadaku] no east_player_option found — trying generic/headless")
-		return scrapeSamehadakuFallback(pageURL)
-	}
-
-	log.Printf("[Samehadaku] found %d player mirrors (best first)", len(mirrors))
-	for i, m := range mirrors {
-		if i < 8 {
-			log.Printf("[Samehadaku]   #%d post=%d nume=%d label=%q score=%d", i+1, m.PostID, m.Nume, m.Label, m.Score)
-		}
-	}
-
-	ajaxURL := samehaAjaxURL(pageURL)
-	var lastErr error
-	// Try top mirrors until one resolves
-	maxTry := 6
-	if len(mirrors) < maxTry {
-		maxTry = len(mirrors)
-	}
-
-	for i := 0; i < maxTry; i++ {
-		m := mirrors[i]
-		log.Printf("[Samehadaku] Trying mirror %q (nume=%d, hasIframeSrc=%t)…", m.Label, m.Nume, m.IframeSrc != "")
-
-		embed := m.IframeSrc
-		if embed == "" {
-			var err error
-			embed, err = fetchSamehaPlayerEmbed(ajaxURL, pageURL, m)
-			if err != nil {
-				lastErr = err
-				log.Printf("[Samehadaku] player_ajax failed for nume=%d: %v", m.Nume, err)
-				continue
-			}
-		}
-		log.Printf("[Samehadaku] embed: %s", truncateURL(embed, 100))
-
-		streamURL, err := resolveSamehaEmbed(embed, pageURL)
-		if err != nil || !isPlayableStreamURL(streamURL) {
-			if strings.Contains(strings.ToLower(embed), "mega.nz/embed") || isBloggerVideoURL(embed) {
-				streamURL = embed
-			} else {
-				if err != nil {
-					lastErr = err
-				}
-				log.Printf("[Samehadaku] resolve embed failed: %v", err)
-				continue
-			}
-		}
-
-		meta := extractSamehaMetadata(html, pageURL)
-		meta.VideoURL = streamURL
-		meta.Source = "samehadaku"
-		if meta.Title == "" {
-			meta.Title = m.Label
-		}
-		// Prefer showing quality label in episode field when useful
-		if meta.Episode == "" && m.Label != "" {
-			meta.Episode = m.Label
-		}
-
-		RegisterStreamMetadata(meta.VideoURL, meta.ThumbnailURL)
-		RegisterStreamURLs(embed)
-		log.Printf("[Samehadaku] SUCCESS via %q → %s", m.Label, truncateURL(streamURL, 100))
-		return meta, nil
-	}
-
-	log.Printf("[Samehadaku] all AJAX mirrors failed (last=%v) — fallback generic/headless", lastErr)
 	return scrapeSamehadakuFallback(pageURL)
 }
 
