@@ -306,6 +306,12 @@ a:hover { opacity: 0.8; }
   bottom: auto;
   top: calc(100% + 8px);
 }
+.room-header__right [data-tooltip]::after,
+.controls-buttons > button:last-child[data-tooltip]::after {
+  left: auto;
+  right: 0;
+  transform: none;
+}
 
 /* --- Vue Transitions --- */
 .fade-enter-active, .fade-leave-active { transition: opacity var(--transition-base); }

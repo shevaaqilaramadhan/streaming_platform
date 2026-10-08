@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 	"watchparty-backend/handlers"
@@ -80,16 +81,55 @@ func corsMiddleware(next http.HandlerFunc) http.HandlerFunc {
 	}
 }
 
+type createRoomReq struct {
+	PIN string `json:"pin,omitempty"`
+}
+
 func handleCreateRoom(w http.ResponseWriter, r *http.Request) {
+	if r.Method == http.MethodGet {
+		roomID := strings.TrimSpace(r.URL.Query().Get("roomId"))
+		if roomID == "" {
+			http.Error(w, "roomId is required", http.StatusBadRequest)
+			return
+		}
+		room, exists := services.GetRoom(roomID)
+		hasPin := false
+		isPublic := false
+		roomName := ""
+		if exists && room != nil {
+			room.Mutex.Lock()
+			hasPin = room.PIN != ""
+			isPublic = room.IsPublic
+			roomName = room.RoomName
+			room.Mutex.Unlock()
+		}
+		response := map[string]interface{}{
+			"roomId":   roomID,
+			"exists":   exists,
+			"hasPin":   hasPin,
+			"isPublic": isPublic,
+			"roomName": roomName,
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(response)
+		return
+	}
+
 	if r.Method != http.MethodPost {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
 
-	roomID, hostToken := services.CreateRoom()
-	response := map[string]string{
+	var req createRoomReq
+	if r.Body != nil {
+		_ = json.NewDecoder(r.Body).Decode(&req)
+	}
+
+	roomID, hostToken := services.CreateRoomWithPIN(req.PIN)
+	response := map[string]interface{}{
 		"roomId":    roomID,
 		"hostToken": hostToken,
+		"hasPin":    req.PIN != "",
 	}
 	data, err := json.Marshal(response)
 	if err != nil {

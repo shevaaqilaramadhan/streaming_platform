@@ -63,7 +63,6 @@ const statusLabel = computed(() => {
 }
 .status--connected .dot {
   background: hsl(120, 40%, 60%);
-  animation: pulse-glow-green 2s infinite;
 }
 
 /* Connecting / Reconnecting */
@@ -87,10 +86,6 @@ const statusLabel = computed(() => {
   background: hsl(0, 60%, 65%);
 }
 
-@keyframes pulse-glow-green {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(52,211,153,0.5); }
-  50%       { box-shadow: 0 0 0 5px rgba(52,211,153,0); }
-}
 @keyframes blink {
   50% { opacity: 0; }
 }

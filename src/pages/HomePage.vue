@@ -40,15 +40,50 @@
           <p class="hero-label">Watch together, perfectly in sync</p>
           <h1 class="hero-title">The simplest way to<br/>watch videos with friends.</h1>
           <p class="hero-desc">Create a room, paste a video link, and watch in perfect synchronization with anyone, anywhere. No sign-up, no plugins — just press play.</p>
-          <div class="hero-actions">
-            <button class="btn btn-primary btn-lg" :disabled="isCreating" @click="createRoom">
-              <span v-if="isCreating" class="spinner-sm"></span>
-              <svg v-else width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
-              {{ isCreating ? 'Creating…' : 'Create Room' }}
-            </button>
-            <div class="hero-join">
-              <input v-model="joinRoomId" type="text" placeholder="Enter room code" maxlength="20" spellcheck="false" @keydown.enter="joinRoom" />
-              <button class="btn btn-ghost" :disabled="!joinRoomId.trim()" @click="joinRoom">Join</button>
+          <div class="hero-actions-panel">
+            <!-- Create Party Box -->
+            <div class="action-box action-box--create">
+              <button class="btn btn-primary btn-lg create-btn" :disabled="isCreating" @click="createRoom">
+                <span v-if="isCreating" class="spinner-sm"></span>
+                <svg v-else width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
+                {{ isCreating ? 'Creating…' : 'Create Room' }}
+              </button>
+
+              <div class="pin-toggle-row">
+                <label class="pin-checkbox-label">
+                  <input type="checkbox" v-model="enablePin" />
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+                    <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+                  </svg>
+                  <span>Lock with PIN</span>
+                </label>
+                <input
+                  v-if="enablePin"
+                  v-model="roomPin"
+                  type="password"
+                  class="input input-sm pin-input"
+                  placeholder="Set PIN (e.g. 1234)"
+                  maxlength="16"
+                  autocomplete="off"
+                />
+              </div>
+            </div>
+
+            <!-- Join Party Box -->
+            <div class="action-box action-box--join">
+              <span class="join-divider-label">or enter code</span>
+              <div class="hero-join">
+                <input
+                  v-model="joinRoomId"
+                  type="text"
+                  placeholder="Room code…"
+                  maxlength="20"
+                  spellcheck="false"
+                  @keydown.enter="joinRoom"
+                />
+                <button class="btn btn-ghost" :disabled="!joinRoomId.trim()" @click="joinRoom">Join</button>
+              </div>
             </div>
           </div>
           <Transition name="fade">
@@ -139,7 +174,7 @@
                     <span class="mock-avatar avatar-blue">A</span>
                     <div class="mock-msg-bubble">
                       <span class="mock-msg-user">Alice</span>
-                      <p class="mock-msg-text">The stream quality is awesome! 🍿</p>
+                      <p class="mock-msg-text">The stream quality is awesome!</p>
                     </div>
                   </div>
                   <div class="mock-msg sender-self">
@@ -152,7 +187,7 @@
                     <span class="mock-avatar avatar-pink">B</span>
                     <div class="mock-msg-bubble">
                       <span class="mock-msg-user">Bob</span>
-                      <p class="mock-msg-text">Ready for the next episode? 🙌</p>
+                      <p class="mock-msg-text">Ready for the next episode?</p>
                     </div>
                   </div>
                 </div>
@@ -253,6 +288,8 @@ const joinRoomId = ref('')
 const errorMsg = ref('')
 const flashMsg = ref('')
 const mobileMenuOpen = ref(false)
+const enablePin = ref(false)
+const roomPin = ref('')
 
 onMounted(() => {
   try {
@@ -274,11 +311,19 @@ async function createRoom() {
   isCreating.value = true
   errorMsg.value = ''
   try {
-    const res = await fetch(`${API_BASE}/api/rooms`, { method: 'POST' })
+    const pinPayload = enablePin.value ? roomPin.value.trim() : ''
+    const res = await fetch(`${API_BASE}/api/rooms`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ pin: pinPayload })
+    })
     if (!res.ok) throw new Error('Server error')
     const data = await res.json()
     if (data.hostToken && typeof sessionStorage !== 'undefined') {
       sessionStorage.setItem(`wp_host_${data.roomId}`, data.hostToken)
+    }
+    if (pinPayload && typeof sessionStorage !== 'undefined') {
+      sessionStorage.setItem(`wp_pin_${data.roomId}`, pinPayload)
     }
     router.push({ name: 'room', params: { roomId: data.roomId } })
   } catch {
@@ -452,12 +497,48 @@ const steps = [
   margin-bottom: var(--space-10);
   max-width: 520px;
 }
-.hero-actions {
+.hero-actions-panel {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: var(--space-4);
   flex-wrap: wrap;
 }
+
+.action-box {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.action-box--create {
+  min-width: 200px;
+}
+
+.create-btn {
+  width: 100%;
+}
+
+.pin-toggle-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.action-box--join {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: var(--space-3);
+  margin-top: 2px;
+}
+
+.join-divider-label {
+  font-size: 0.8125rem;
+  color: var(--text-muted);
+  text-transform: lowercase;
+}
+
 .hero-join {
   display: flex;
   align-items: center;
@@ -479,7 +560,7 @@ const steps = [
   font-size: 0.875rem;
   color: var(--text-primary);
   outline: none;
-  width: 180px;
+  width: 140px;
 }
 .hero-join input::placeholder { color: var(--text-muted); }
 .hero-join .btn {
@@ -1118,5 +1199,27 @@ const steps = [
   .mock-meta-title { font-size: 0.7rem; }
   .mock-status-pill { display: none; }
   .address-bar span { font-size: 0.65rem; }
+}
+
+.pin-checkbox-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.8125rem;
+  color: var(--text-secondary);
+  cursor: pointer;
+  user-select: none;
+}
+.pin-checkbox-label input[type="checkbox"] {
+  accent-color: var(--color-primary);
+  cursor: pointer;
+}
+
+.pin-input {
+  max-width: 140px;
+  height: 32px;
+  font-size: 0.8rem;
+  padding: 0 0.5rem;
+  letter-spacing: 0.1em;
 }
 </style>

@@ -1,9 +1,9 @@
 <template>
   <header class="room-header glass">
-    <!-- Left: Logo + Room Info -->
+    <!-- Left: Brand + Room Identity -->
     <div class="room-header__left">
       <div class="logo">
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
           <rect x="1" y="1" width="22" height="22" rx="5" stroke="currentColor" stroke-width="1.5"/>
           <polygon points="10,7 18,12 10,17" fill="currentColor"/>
         </svg>
@@ -12,105 +12,74 @@
 
       <div class="divider"></div>
 
+      <!-- Room identity items -->
       <div class="room-info">
-        <!-- Room name display / inline edit -->
-        <div v-if="isEditingName" class="room-name-edit">
-          <input
-            ref="nameInputRef"
-            v-model="editingName"
-            class="room-name-input"
-            type="text"
-            maxlength="40"
-            placeholder="Room name"
-            @keydown.enter="saveName"
-            @keydown.esc="cancelEditName"
-            @blur="saveName"
-          />
-        </div>
-        <template v-else>
-          <span v-if="displayName" class="room-name" @click="startEditName" :data-tooltip="isHost ? 'Click to edit' : ''">
-            {{ displayName }}
-          </span>
-          <span class="room-label">Room</span>
-          <span class="room-id">{{ roomId }}</span>
-        </template>
+        <span v-if="displayName" class="room-name" :title="displayName">
+          {{ displayName }}
+        </span>
 
-        <button
-          v-if="isHost && !isEditingName"
-          class="btn btn-ghost btn-sm edit-name-btn"
-          @click="startEditName"
-          data-tooltip="Edit room name"
-          aria-label="Edit room name"
-        >
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
-            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
-          </svg>
-        </button>
-
+        <!-- Room code chip with 1-click copy -->
         <button
           id="copy-room-link-btn"
-          class="btn btn-ghost btn-sm copy-btn"
-          :class="{ 'copy-btn--copied': copied }"
+          class="room-code-chip"
+          :class="{ 'room-code-chip--copied': copied }"
           @click="copyLink"
-          data-tooltip="Copy invite link"
+          data-tooltip="Click to copy invite link"
           aria-label="Copy room invite link"
         >
-          <svg v-if="!copied" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <span class="room-code-label">Room:</span>
+          <strong>{{ roomId }}</strong>
+          <svg v-if="!copied" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
             <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
           </svg>
-          <svg v-else width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+          <svg v-else width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
             <polyline points="20 6 9 17 4 12"/>
           </svg>
-          <span>{{ copied ? 'Copied!' : 'Share' }}</span>
         </button>
 
-        <!-- Room Visibility Status / Toggle -->
-        <button
-          v-if="isHost"
-          id="toggle-visibility-btn"
-          class="btn btn-ghost btn-sm visibility-btn"
-          :class="{ 'visibility-btn--public': isPublic }"
-          @click="$emit('toggle-public', !isPublic)"
-          :data-tooltip="isPublic ? 'Make room private' : 'Make room public'"
-          aria-label="Toggle room public visibility"
+        <!-- Status badges -->
+        <span
+          class="status-pill"
+          :class="isPublic ? 'status-pill--public' : 'status-pill--private'"
+          :data-tooltip="isPublic ? 'Public room (listed in lobby)' : 'Private room (link only)'"
         >
-          <svg v-if="isPublic" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <circle cx="12" cy="12" r="10"/>
-            <line x1="2" y1="12" x2="22" y2="12"/>
-            <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
-          </svg>
-          <svg v-else width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
-            <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
-          </svg>
-          <span>{{ isPublic ? 'Public' : 'Private' }}</span>
-        </button>
+          {{ isPublic ? 'Public' : 'Private' }}
+        </span>
 
         <span
-          v-else
-          class="room-visibility-badge"
-          :class="{ 'room-visibility-badge--public': isPublic }"
-          :data-tooltip="isPublic ? 'This room is public and appears in the lobby' : 'This room is private and can only be joined via link'"
+          v-if="hasPin"
+          class="status-pill status-pill--pin"
+          data-tooltip="Protected by Room PIN"
         >
-          <svg v-if="isPublic" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <circle cx="12" cy="12" r="10"/>
-            <line x1="2" y1="12" x2="22" y2="12"/>
-            <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
-          </svg>
-          <svg v-else width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
             <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
           </svg>
-          <span>{{ isPublic ? 'Public' : 'Private' }}</span>
+          PIN
         </span>
+
+        <!-- Host Room Settings trigger -->
+        <button
+          v-if="isHost"
+          id="room-settings-btn"
+          class="btn btn-ghost btn-sm settings-trigger-btn"
+          @click="showSettingsModal = true"
+          data-tooltip="Room settings & security"
+          aria-label="Room Settings"
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="3"/>
+            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+          </svg>
+          <span class="settings-btn-label">Settings</span>
+        </button>
       </div>
     </div>
 
-    <!-- Right: User info + status -->
+    <!-- Right: User Info + Status -->
     <div class="room-header__right">
-      <!-- Participant count (clickable) -->
+      <!-- Participant count button -->
       <button
         class="participant-count-btn"
         data-tooltip="View participants"
@@ -126,7 +95,7 @@
         <span>{{ participantCount }}</span>
       </button>
 
-      <!-- User badge -->
+      <!-- User role badge -->
       <span class="badge" :class="isHost ? 'badge-host' : 'badge-guest'">
         <svg v-if="isHost" width="10" height="10" viewBox="0 0 24 24" fill="currentColor">
           <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
@@ -138,16 +107,31 @@
         {{ isHost ? 'Host' : nickname }}
       </span>
 
+      <!-- Connection Status -->
       <ConnectionStatus :status="wsStatus" />
+
+      <!-- Theme Toggle -->
       <ThemeToggle />
     </div>
+
+    <!-- Host Settings Modal -->
+    <RoomSettingsModal
+      v-if="isHost"
+      v-model="showSettingsModal"
+      :room-id="roomId"
+      :room-name="roomName"
+      :is-public="isPublic"
+      :has-pin="hasPin"
+      @save="onSaveSettings"
+    />
   </header>
 </template>
 
 <script setup>
-import { ref, nextTick, computed } from 'vue'
+import { ref, computed } from 'vue'
 import ConnectionStatus from './ConnectionStatus.vue'
 import ThemeToggle from './ThemeToggle.vue'
+import RoomSettingsModal from './RoomSettingsModal.vue'
 
 const props = defineProps({
   roomId:           { type: String, required: true },
@@ -156,15 +140,14 @@ const props = defineProps({
   wsStatus:         { type: String, required: true },
   participantCount: { type: Number, default: 1 },
   isPublic:         { type: Boolean, default: false },
+  hasPin:           { type: Boolean, default: false },
   roomName:         { type: String, default: '' },
 })
 
-const emit = defineEmits(['toggle-public', 'toggle-user-list', 'set-room-name'])
+const emit = defineEmits(['toggle-public', 'toggle-user-list', 'set-room-name', 'set-room-pin'])
 
 const copied = ref(false)
-const isEditingName = ref(false)
-const editingName = ref('')
-const nameInputRef = ref(null)
+const showSettingsModal = ref(false)
 
 const displayName = computed(() => props.roomName || '')
 
@@ -179,27 +162,18 @@ function copyLink() {
   })
 }
 
-function startEditName() {
-  if (!props.isHost) return
-  editingName.value = props.roomName || ''
-  isEditingName.value = true
-  nextTick(() => {
-    nameInputRef.value?.focus()
-    nameInputRef.value?.select()
-  })
-}
-
-function saveName() {
-  if (!isEditingName.value) return
-  const name = editingName.value.trim()
-  isEditingName.value = false
-  if (name !== (props.roomName || '')) {
-    emit('set-room-name', name)
+function onSaveSettings(settings) {
+  if (settings.roomName !== (props.roomName || '')) {
+    emit('set-room-name', settings.roomName)
   }
-}
-
-function cancelEditName() {
-  isEditingName.value = false
+  if (settings.isPublic !== props.isPublic) {
+    emit('toggle-public', settings.isPublic)
+  }
+  if (settings.removePin) {
+    emit('set-room-pin', '')
+  } else if (settings.pin) {
+    emit('set-room-pin', settings.pin)
+  }
 }
 </script>
 
@@ -208,7 +182,8 @@ function cancelEditName() {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: var(--space-3) var(--space-6);
+  padding: 0 var(--space-6);
+  height: 58px;
   gap: var(--space-4);
   position: sticky;
   top: 0;
@@ -217,22 +192,35 @@ function cancelEditName() {
   border-top: none;
   border-left: none;
   border-right: none;
+  border-bottom: 1px solid var(--color-border);
+  background: rgba(10, 10, 12, 0.85);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
 }
 
-.room-header__left,
+.room-header__left {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-width: 0;
+  flex: 1;
+}
+
 .room-header__right {
   display: flex;
   align-items: center;
-  gap: var(--space-4);
+  gap: var(--space-3);
+  flex-shrink: 0;
 }
 
 .logo {
   display: flex;
   align-items: center;
-  gap: var(--space-2);
+  gap: 7px;
+  flex-shrink: 0;
 }
 .logo-name {
-  font-size: 1.05rem;
+  font-size: 1rem;
   font-weight: 700;
   letter-spacing: -0.02em;
   color: var(--text-primary);
@@ -240,71 +228,107 @@ function cancelEditName() {
 
 .divider {
   width: 1px;
-  height: 20px;
+  height: 18px;
   background: var(--color-border);
+  flex-shrink: 0;
 }
 
 .room-info {
   display: flex;
   align-items: center;
   gap: var(--space-2);
+  min-width: 0;
+  overflow: hidden;
 }
-.room-label {
-  font-size: 0.75rem;
-  color: var(--text-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  font-weight: 600;
-}
-.room-id {
+
+.room-name {
   font-size: 0.875rem;
-  font-weight: 600;
+  font-weight: 700;
+  color: var(--text-primary);
+  max-width: 14rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex-shrink: 1;
+}
+
+/* Room Code Chip (clickable copy) */
+.room-code-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: 3px 8px;
+  font-size: 0.8125rem;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  flex-shrink: 0;
+}
+.room-code-chip:hover {
+  background: rgba(255, 255, 255, 0.09);
+  color: var(--text-primary);
+  border-color: rgba(255, 255, 255, 0.15);
+}
+.room-code-chip strong {
   font-family: var(--font-mono);
   color: var(--text-primary);
-  background: rgba(255,255,255,0.06);
-  padding: 2px 8px;
-  border-radius: var(--radius-sm);
-  border: 1px solid var(--color-border);
 }
-
-.copy-btn { gap: 4px; }
-.copy-btn--copied { color: var(--color-accent-green) !important; }
-
-.visibility-btn {
-  gap: 4px;
+.room-code-label {
+  font-size: 0.72rem;
   color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
 }
-.visibility-btn--public {
-  color: var(--text-primary) !important;
-  background: rgba(255,255,255,0.06);
-  border-color: rgba(255,255,255,0.1);
+.room-code-chip--copied {
+  color: var(--color-accent-green) !important;
+  border-color: var(--color-accent-green) !important;
 }
 
-.room-visibility-badge {
+/* Status pills */
+.status-pill {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  padding: 4px 8px;
+  padding: 3px 7px;
   border-radius: var(--radius-sm);
-  font-size: 0.8125rem;
+  font-size: 0.72rem;
   font-weight: 600;
-  color: var(--text-muted);
-  background: rgba(255, 255, 255, 0.03);
+  flex-shrink: 0;
+}
+.status-pill--public {
+  color: var(--text-secondary);
+  background: rgba(255, 255, 255, 0.04);
   border: 1px solid var(--color-border);
 }
-.room-visibility-badge--public {
-  color: var(--text-primary);
-  background: rgba(255,255,255,0.06);
-  border-color: rgba(255,255,255,0.1);
+.status-pill--private {
+  color: var(--text-muted);
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid var(--color-border);
+}
+.status-pill--pin {
+  color: var(--color-accent-amber, #f59e0b);
+  background: rgba(245, 158, 11, 0.08);
+  border: 1px solid rgba(245, 158, 11, 0.25);
 }
 
-.participant-count {
-  display: flex;
+/* Host settings button */
+.settings-trigger-btn {
+  display: inline-flex;
   align-items: center;
   gap: 5px;
+  padding: 4px 8px;
+  font-size: 0.78rem;
+  flex-shrink: 0;
   color: var(--text-secondary);
-  font-size: 0.8125rem;
-  font-weight: 600;
+  border: 1px solid transparent;
+}
+.settings-trigger-btn:hover {
+  color: var(--text-primary);
+  border-color: var(--color-border);
+  background: rgba(255, 255, 255, 0.05);
 }
 
 .participant-count-btn {
@@ -321,6 +345,7 @@ function cancelEditName() {
   cursor: pointer;
   transition: all var(--transition-fast);
   font-family: var(--font-sans);
+  flex-shrink: 0;
 }
 .participant-count-btn:hover {
   color: var(--text-primary);
@@ -328,92 +353,36 @@ function cancelEditName() {
   border-color: rgba(255, 255, 255, 0.12);
 }
 
-/* Room name */
-.room-name {
-  font-size: 0.875rem;
-  font-weight: 700;
-  color: var(--text-primary);
-  cursor: default;
-  max-width: 12rem;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.is-host .room-name,
-.room-name[data-tooltip] {
-  cursor: pointer;
-}
-
-.edit-name-btn {
-  padding: 4px;
-  width: 28px;
-  height: 28px;
-}
-
-.room-name-edit {
-  display: flex;
+.badge {
+  display: inline-flex;
   align-items: center;
-}
-
-.room-name-input {
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid var(--color-primary);
-  border-radius: var(--radius-sm);
-  color: var(--text-primary);
-  font-family: var(--font-sans);
-  font-size: 0.85rem;
-  font-weight: 600;
+  gap: 5px;
   padding: 3px 8px;
-  width: 160px;
-  outline: none;
-  box-shadow: 0 0 0 3px rgba(255,255,255,0.04);
+  border-radius: var(--radius-sm);
+  font-size: 0.75rem;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+.badge-host {
+  background: rgba(245, 158, 11, 0.12);
+  color: var(--color-accent-amber, #f59e0b);
+  border: 1px solid rgba(245, 158, 11, 0.25);
+}
+.badge-guest {
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text-secondary);
+  border: 1px solid var(--color-border);
 }
 
-@media (max-width: 600px) {
+@media (max-width: 768px) {
   .logo-name { display: none; }
-  .divider { display: none; }
-  .room-label { display: none; }
-  .room-header { padding: var(--space-3) var(--space-4); }
+  .settings-btn-label { display: none; }
+  .room-header { padding: 0 var(--space-4); }
 }
 
-@media (max-width: 414px) {
-  .room-header {
-    gap: var(--space-2);
-    padding: var(--space-2) var(--space-3);
-    flex-wrap: wrap;
-  }
-  .room-header__left {
-    flex: 1 1 auto;
-    min-width: 0;
-    gap: var(--space-2);
-    overflow: hidden;
-  }
-  .room-header__right {
-    flex-shrink: 0;
-    gap: var(--space-2);
-  }
-  .room-info {
-    min-width: 0;
-    flex-wrap: wrap;
-  }
-  .room-id {
-    font-size: 0.75rem;
-    padding: 2px 6px;
-    max-width: 8rem;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-  .room-name {
-    max-width: 6rem;
-    font-size: 0.8rem;
-  }
-  .room-name-input {
-    width: 120px;
-  }
-  .copy-btn span { display: none; }
-  .visibility-btn span { display: none; }
-  .room-visibility-badge span { display: none; }
-  .badge { font-size: 0.6875rem; padding: 2px 6px; }
-  .badge { max-width: 5.5rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+@media (max-width: 520px) {
+  .divider { display: none; }
+  .room-code-label { display: none; }
+  .status-pill { display: none; }
 }
 </style>

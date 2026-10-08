@@ -20,6 +20,7 @@ type WatchRoom struct {
 	RoomID          string
 	HostID          string
 	HostToken       string // single-use claim secret; never expose over public APIs
+	PIN             string // optional 4-digit or custom access PIN
 	CurrentVideo    string
 	CurrentTime     float64
 	IsPlaying       bool
@@ -42,6 +43,7 @@ type JoinPayload struct {
 	RoomID    string `json:"roomId"`
 	Username  string `json:"username"`
 	HostToken string `json:"hostToken,omitempty"`
+	PIN       string `json:"pin,omitempty"`
 }
 
 type Participant struct {
@@ -59,6 +61,7 @@ type RoomInitPayload struct {
 	Metadata     *QueueItem    `json:"metadata,omitempty"`
 	Queue        []*QueueItem  `json:"queue,omitempty"`
 	IsPublic     bool          `json:"isPublic"`
+	HasPIN       bool          `json:"hasPin,omitempty"`
 	HostID       string        `json:"hostId,omitempty"`
 	IsHost       bool          `json:"isHost"`
 }
@@ -101,19 +104,21 @@ type ScrapeErrorPayload struct {
 }
 
 type VideoMetadata struct {
-	VideoURL     string `json:"videoUrl"`
-	Title        string `json:"title,omitempty"`
-	Episode      string `json:"episode,omitempty"`
-	ThumbnailURL string `json:"thumbnailUrl,omitempty"`
-	Source       string `json:"source,omitempty"`
+	VideoURL       string `json:"videoUrl"`
+	Title          string `json:"title,omitempty"`
+	Episode        string `json:"episode,omitempty"`
+	ThumbnailURL   string `json:"thumbnailUrl,omitempty"`
+	Source         string `json:"source,omitempty"`
+	NextEpisodeURL string `json:"nextEpisodeUrl,omitempty"`
 }
 
 type QueueItem struct {
-	ID        string `json:"id"`
-	URL       string `json:"url"`
-	Title     string `json:"title"`
-	Episode   string `json:"episode"`
-	Thumbnail string `json:"thumbnail"`
+	ID             string `json:"id"`
+	URL            string `json:"url"`
+	Title          string `json:"title"`
+	Episode        string `json:"episode"`
+	Thumbnail      string `json:"thumbnail"`
+	NextEpisodeURL string `json:"nextEpisodeUrl,omitempty"`
 }
 
 type AddToQueuePayload struct {
@@ -137,12 +142,18 @@ type PublicRoomInfo struct {
 	HostUsername     string     `json:"hostUsername"`
 	ParticipantCount int        `json:"participantCount"`
 	QueueSize        int        `json:"queueSize"`
+	HasPIN           bool       `json:"hasPin,omitempty"`
 	CurrentMetadata  *QueueItem `json:"currentMetadata,omitempty"`
 }
 
 type TogglePublicPayload struct {
 	RoomID   string `json:"roomId"`
 	IsPublic bool   `json:"isPublic"`
+}
+
+type SetRoomPinPayload struct {
+	RoomID string `json:"roomId"`
+	PIN    string `json:"pin"`
 }
 
 type TransferHostPayload struct {

@@ -202,5 +202,25 @@ func extractSokujaMetadata(html, pageURL string) *models.VideoMetadata {
 		meta.ThumbnailURL = m[1]
 	}
 	meta.Episode = cleanEpisodeString(meta.Title)
+
+	// Extract Next Episode link if available
+	nextRe := regexp.MustCompile(`(?i)<a[^>]+href=["']([^"']+)["'][^>]*>(?:[^<]*)(?:next|eps berikutnya|episode berikutnya|selanjutnya)(?:[^<]*)</a>|<a[^>]+rel=["']next["'][^>]+href=["']([^"']+)["']|<a[^>]+href=["']([^"']+)["'][^>]+rel=["']next["']`)
+	if m := nextRe.FindStringSubmatch(html); len(m) > 1 {
+		nextHref := m[1]
+		if nextHref == "" && len(m) > 2 {
+			nextHref = m[2]
+		}
+		if nextHref == "" && len(m) > 3 {
+			nextHref = m[3]
+		}
+		if nextHref != "" && nextHref != "#" {
+			if u, err := url.Parse(nextHref); err == nil {
+				if base, err := url.Parse(pageURL); err == nil {
+					meta.NextEpisodeURL = base.ResolveReference(u).String()
+				}
+			}
+		}
+	}
+
 	return meta
 }

@@ -58,8 +58,13 @@ export function isDirectPlayableUrl(url) {
   }
 }
 
-export function useRoom(roomId, nickname, hostToken = '') {
+export function useRoom(roomId, nickname, hostToken = '', initialPin = '') {
   const { status, WS_STATUS, connect, disconnect, send, onMessage } = useWebSocket(roomId)
+
+  // PIN state
+  const roomPin = ref(initialPin)
+  const hasPin = ref(false)
+  const authError = ref(null)
 
   // After kick: never re-JOIN even if a stale CONNECTED status fires
   let wasKicked = isRoomKicked(roomId)
@@ -171,6 +176,9 @@ export function useRoom(roomId, nickname, hostToken = '') {
       if (hostToken) {
         payload.hostToken = hostToken
       }
+      if (roomPin.value) {
+        payload.pin = roomPin.value
+      }
       send({
         action: MSG_TYPES.JOIN_EVENT,
         payload,
@@ -181,8 +189,20 @@ export function useRoom(roomId, nickname, hostToken = '') {
   /* ---- Incoming Message Handler ---- */
   const unregister = onMessage((data) => {
     switch (data.action) {
+      case 'AUTH_ERROR':
+        authError.value = data.payload?.reason || 'Authentication failed'
+        if (data.payload?.requiresPin) {
+          hasPin.value = true
+        }
+        break
+
+      case 'ROOM_PIN_UPDATED':
+        hasPin.value = !!data.payload?.hasPin
+        break
+
       case MSG_TYPES.ROOM_INIT:
         // Server tells the new joiner the current room state
+        authError.value = null
         if (data.payload) {
           playerState.value.videoUrl    = data.payload.currentVideo || ''
           playerState.value.currentTime = data.payload.currentTime  || 0
@@ -194,6 +214,7 @@ export function useRoom(roomId, nickname, hostToken = '') {
         currentMetadata.value = data.payload?.metadata || null
         queue.value = data.payload?.queue || []
         isPublic.value = data.payload?.isPublic || false
+        hasPin.value = !!data.payload?.hasPin
         roomName.value = data.payload?.roomName || ''
 
         if (data.payload?.hostId) {
@@ -558,6 +579,32 @@ export function useRoom(roomId, nickname, hostToken = '') {
     roomName.value = name
   }
 
+  function setRoomPin(pin) {
+    if (!isHost.value) return
+    send({
+      action: 'SET_ROOM_PIN',
+      payload: { roomId, pin }
+    })
+    hasPin.value = !!pin
+  }
+
+  function submitPinAndJoin(pin) {
+    roomPin.value = pin
+    authError.value = null
+    const payload = {
+      roomId,
+      username: nickname,
+      pin,
+    }
+    if (hostToken) {
+      payload.hostToken = hostToken
+    }
+    send({
+      action: MSG_TYPES.JOIN_EVENT,
+      payload,
+    })
+  }
+
   function sendReaction(emoji) {
     send({
       action: MSG_TYPES.REACTION,
@@ -591,6 +638,8 @@ export function useRoom(roomId, nickname, hostToken = '') {
     currentMetadata,
     queue,
     isPublic,
+    hasPin,
+    authError,
     roomName,
     typingUsers,
     reactions,
@@ -608,6 +657,8 @@ export function useRoom(roomId, nickname, hostToken = '') {
     transferHost,
     kickUser,
     setRoomName,
+    setRoomPin,
+    submitPinAndJoin,
     sendReaction,
     sendTyping,
     onKicked,

@@ -128,6 +128,8 @@ func HandleMessage(user *models.User, room *models.WatchRoom, msgBytes []byte) {
 		handleKickUser(user, room, msg.Payload)
 	case "SET_ROOM_NAME":
 		handleSetRoomName(user, room, msg.Payload)
+	case "SET_ROOM_PIN":
+		handleSetRoomPIN(user, room, msg.Payload)
 	case "REACTION":
 		handleReaction(user, room, msg.Payload)
 	case "TYPING":
@@ -154,6 +156,28 @@ func handleJoinEvent(user *models.User, room *models.WatchRoom, payloadRaw json.
 		alreadyInRoom = true
 	}
 
+	// Validate PIN for guests if room has a PIN set
+	if room.PIN != "" && !alreadyInRoom {
+		isClaimingHost := room.HostToken != "" && hostTokenMatches(payload.HostToken, room.HostToken)
+		isAlreadyHost := room.HostID != "" && room.HostID == user.ID
+		if !isClaimingHost && !isAlreadyHost {
+			if strings.TrimSpace(payload.PIN) != room.PIN {
+				room.Mutex.Unlock()
+				log.Printf("Room %s rejected join from %s: invalid or missing PIN", room.RoomID, user.Username)
+				rejectMsg := models.Message{
+					Action: "AUTH_ERROR",
+					Payload: mustMarshalRaw(map[string]interface{}{
+						"roomId":      room.RoomID,
+						"reason":      "invalid_pin",
+						"requiresPin": true,
+					}),
+				}
+				SendToUser(user, mustMarshal(rejectMsg))
+				return
+			}
+		}
+	}
+
 	if !alreadyInRoom {
 		if len(room.Clients) >= MaxUsersPerRoom {
 			room.Mutex.Unlock()
@@ -174,6 +198,7 @@ func handleJoinEvent(user *models.User, room *models.WatchRoom, payloadRaw json.
 	room.EmptySince = time.Time{}
 	assignHostOnJoin(user, room, payload.HostToken)
 	isPublic := room.IsPublic
+	hasPIN := room.PIN != ""
 	hostID := room.HostID
 	isHost := user.IsHost
 	roomName := room.RoomName
@@ -193,6 +218,7 @@ func handleJoinEvent(user *models.User, room *models.WatchRoom, payloadRaw json.
 			Metadata:     metadata,
 			Queue:        queue,
 			IsPublic:     isPublic,
+			HasPIN:       hasPIN,
 			HostID:       hostID,
 			IsHost:       isHost,
 		})),
@@ -787,6 +813,41 @@ func handleSetRoomName(user *models.User, room *models.WatchRoom, payloadRaw jso
 		Payload: mustMarshalRaw(models.RoomNameChangedPayload{
 			RoomID:   room.RoomID,
 			RoomName: name,
+		}),
+	}
+	BroadcastToRoom(room, mustMarshal(broadcastMsg), nil)
+}
+
+func handleSetRoomPIN(user *models.User, room *models.WatchRoom, payloadRaw json.RawMessage) {
+	if !user.IsHost {
+		log.Printf("Non-host %s tried to SET_ROOM_PIN", user.Username)
+		return
+	}
+
+	var payload models.SetRoomPinPayload
+	if err := json.Unmarshal(payloadRaw, &payload); err != nil {
+		log.Println("Invalid SET_ROOM_PIN payload:", err)
+		return
+	}
+
+	newPIN := strings.TrimSpace(payload.PIN)
+	// Max 16 characters for PIN
+	if len(newPIN) > 16 {
+		newPIN = newPIN[:16]
+	}
+
+	room.Mutex.Lock()
+	room.PIN = newPIN
+	hasPIN := room.PIN != ""
+	room.Mutex.Unlock()
+
+	log.Printf("Room %s PIN updated (hasPin=%v) by host %s", room.RoomID, hasPIN, user.Username)
+
+	broadcastMsg := models.Message{
+		Action: "ROOM_PIN_UPDATED",
+		Payload: mustMarshalRaw(map[string]interface{}{
+			"roomId": room.RoomID,
+			"hasPin": hasPIN,
 		}),
 	}
 	BroadcastToRoom(room, mustMarshal(broadcastMsg), nil)

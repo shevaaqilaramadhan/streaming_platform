@@ -44,11 +44,12 @@ func AddToQueue(roomID, url string) (*models.QueueItem, error) {
 		}
 
 		queueItem = &models.QueueItem{
-			ID:        generateQueueItemID(),
-			URL:       metadata.VideoURL,
-			Title:     metadata.Title,
-			Episode:   metadata.Episode,
-			Thumbnail: metadata.ThumbnailURL,
+			ID:             generateQueueItemID(),
+			URL:            metadata.VideoURL,
+			Title:          metadata.Title,
+			Episode:        metadata.Episode,
+			Thumbnail:      metadata.ThumbnailURL,
+			NextEpisodeURL: metadata.NextEpisodeURL,
 		}
 	}
 

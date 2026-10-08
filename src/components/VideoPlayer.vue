@@ -190,6 +190,52 @@
               Watching
             </span>
 
+            <!-- Next Episode Quick Button (Host only) -->
+            <button
+              v-if="isHost && nextEpisodeUrl"
+              id="next-episode-btn"
+              class="ctrl-btn ctrl-btn--next-ep"
+              @click="$emit('play-next-episode', nextEpisodeUrl)"
+              data-tooltip="Play Next Episode ▶"
+              aria-label="Play Next Episode"
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polygon points="5 4 15 12 5 20 5 4"/>
+                <line x1="19" y1="5" x2="19" y2="19"/>
+              </svg>
+            </button>
+
+            <!-- Picture-in-Picture -->
+            <button
+              v-if="supportsPiP"
+              id="pip-btn"
+              class="ctrl-btn"
+              :class="{ 'ctrl-btn--active': isPiP }"
+              @click="togglePiP"
+              :data-tooltip="isPiP ? 'Exit PiP (P)' : 'Picture-in-Picture (P)'"
+              aria-label="Toggle Picture-in-Picture"
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="2" y="3" width="20" height="14" rx="2" ry="2"/>
+                <rect x="11" y="9" width="9" height="6" rx="1" ry="1" :fill="isPiP ? 'currentColor' : 'none'"/>
+              </svg>
+            </button>
+
+            <!-- Fullscreen Chat Toggle -->
+            <button
+              v-if="isFullscreen"
+              id="fs-chat-toggle-btn"
+              class="ctrl-btn"
+              :class="{ 'ctrl-btn--active': showFsChat }"
+              @click="showFsChat = !showFsChat"
+              :data-tooltip="showFsChat ? 'Hide Chat Overlay (C)' : 'Show Chat Overlay (C)'"
+              aria-label="Toggle Fullscreen Chat"
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+              </svg>
+            </button>
+
             <!-- Fullscreen -->
             <button
               id="fullscreen-btn"
@@ -216,22 +262,76 @@
       </div>
     </Transition>
 
+    <!-- Fullscreen Floating Chat Overlay -->
+    <Transition name="fade">
+      <div 
+        v-if="isFullscreen && showFsChat" 
+        class="fs-chat-overlay" 
+        @click.stop
+        @pointerdown.stop
+      >
+        <div class="fs-chat-header">
+          <div class="fs-chat-title">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+            </svg>
+            <span>Live Chat</span>
+          </div>
+          <button class="fs-chat-close-btn" @click="showFsChat = false" title="Close (C)">×</button>
+        </div>
+        <div ref="fsChatScrollRef" class="fs-chat-messages">
+          <div v-if="messages.length === 0" class="fs-chat-empty">
+            No messages yet. Say hello!
+          </div>
+          <div 
+            v-for="msg in messages.slice(-40)" 
+            :key="msg.id || msg.sentAt" 
+            class="fs-chat-msg"
+            :class="{ 'fs-chat-msg--system': msg.isSystem || msg.type === 'system' }"
+          >
+            <span v-if="!msg.isSystem && msg.type !== 'system'" class="fs-chat-username" :class="{ 'fs-chat-username--host': msg.isHost }">
+              {{ msg.username }}:
+            </span>
+            <span class="fs-chat-text">{{ msg.text }}</span>
+          </div>
+        </div>
+        <form class="fs-chat-input-wrap" @submit.prevent="submitFsChat">
+          <input
+            v-model="fsChatText"
+            type="text"
+            class="fs-chat-input"
+            placeholder="Ketik pesan (Enter)..."
+            maxlength="300"
+            @keydown.stop
+          />
+          <button type="submit" class="fs-chat-send-btn" :disabled="!fsChatText.trim()">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="22" y1="2" x2="11" y2="13"/>
+              <polygon points="22 2 15 22 11 13 2 9 22 2"/>
+            </svg>
+          </button>
+        </form>
+      </div>
+    </Transition>
+
     <!-- URL input lives on RoomPage (single host input — avoid double fields) -->
   </div>
 </template>
 
 <script setup>
-import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
+import { ref, computed, watch, onMounted, onUnmounted, nextTick } from 'vue'
 import Hls from 'hls.js'
 import { API_BASE } from '../config.js'
 
 const props = defineProps({
-  isHost:      { type: Boolean, default: false },
-  videoUrl:    { type: String,  default: '' },
-  playerState: { type: Object,  default: () => ({ isPlaying: false, currentTime: 0 }) },
+  isHost:         { type: Boolean, default: false },
+  videoUrl:       { type: String,  default: '' },
+  playerState:    { type: Object,  default: () => ({ isPlaying: false, currentTime: 0 }) },
+  messages:       { type: Array,   default: () => [] },
+  nextEpisodeUrl: { type: String,  default: '' },
 })
 
-const emit = defineEmits(['sync', 'ended', 'error'])
+const emit = defineEmits(['sync', 'ended', 'error', 'send-chat', 'play-next-episode'])
 
 /* ================================================================
    State
@@ -251,6 +351,45 @@ const pendingSeekTime = ref(null)
 const videoMode    = ref(null)  // 'youtube' | 'hls' | 'native'
 const streamError  = ref(null)
 const isInteracting = ref(false)
+
+// PiP state
+const isPiP = ref(false)
+const supportsPiP = computed(() => {
+  return typeof document !== 'undefined' &&
+         'pictureInPictureEnabled' in document &&
+         document.pictureInPictureEnabled &&
+         videoMode.value !== 'youtube'
+})
+
+// Fullscreen Chat Overlay state
+const showFsChat = ref(true)
+const fsChatText = ref('')
+const fsChatScrollRef = ref(null)
+
+function submitFsChat() {
+  const text = fsChatText.value.trim()
+  if (!text) return
+  emit('send-chat', text)
+  fsChatText.value = ''
+  nextTick(() => {
+    if (fsChatScrollRef.value) {
+      fsChatScrollRef.value.scrollTop = fsChatScrollRef.value.scrollHeight
+    }
+  })
+}
+
+async function togglePiP() {
+  if (!videoRef.value || videoMode.value === 'youtube') return
+  try {
+    if (document.pictureInPictureElement) {
+      await document.exitPictureInPicture()
+    } else if (videoRef.value.requestPictureInPicture) {
+      await videoRef.value.requestPictureInPicture()
+    }
+  } catch (err) {
+    console.warn('[PiP] Error toggling Picture-in-Picture:', err)
+  }
+}
 
 let ytPlayer = null         // YouTube IFrame player instance
 let hlsInstance = null       // hls.js instance
@@ -810,14 +949,44 @@ function formatTime(secs) {
 /* ================================================================
    Lifecycle
    ================================================================ */
+function onFullscreenChange() {
+  isFullscreen.value = !!document.fullscreenElement
+}
+
+function handleKeyDown(e) {
+  const tag = document.activeElement?.tagName?.toLowerCase()
+  if (tag === 'input' || tag === 'textarea' || document.activeElement?.isContentEditable) {
+    return
+  }
+
+  if (e.key === 'p' || e.key === 'P') {
+    e.preventDefault()
+    togglePiP()
+  } else if ((e.key === 'c' || e.key === 'C') && isFullscreen.value) {
+    e.preventDefault()
+    showFsChat.value = !showFsChat.value
+  } else if (e.key === 'f' || e.key === 'F') {
+    e.preventDefault()
+    toggleFullscreen()
+  }
+}
+
 onMounted(() => {
   if (props.videoUrl) loadVideo(props.videoUrl)
+  document.addEventListener('fullscreenchange', onFullscreenChange)
+  window.addEventListener('keydown', handleKeyDown)
+  if (videoRef.value) {
+    videoRef.value.addEventListener('enterpictureinpicture', () => { isPiP.value = true })
+    videoRef.value.addEventListener('leavepictureinpicture', () => { isPiP.value = false })
+  }
 })
 
 onUnmounted(() => {
   destroyAllPlayers()
   clearTimeout(controlsTimer)
   clearTimeout(seekTimeout)
+  document.removeEventListener('fullscreenchange', onFullscreenChange)
+  window.removeEventListener('keydown', handleKeyDown)
 })
 </script>
 
@@ -1100,20 +1269,18 @@ onUnmounted(() => {
 /* Mobile responsive */
 @media (max-width: 600px) {
   .controls-buttons {
-    gap: var(--space-1);
+    gap: 3px;
   }
   .ctrl-btn {
     width: 32px;
     height: 32px;
   }
-  .volume-slider {
-    width: 60px;
-  }
+  .volume-slider { display: none; }
   .stream-badge { display: none; }
   .guest-indicator { display: none; }
   .center-play-btn {
-    width: 56px;
-    height: 56px;
+    width: 52px;
+    height: 52px;
   }
   .controls-bar {
     padding: 0 var(--space-3) var(--space-3);
@@ -1124,9 +1291,146 @@ onUnmounted(() => {
   }
 }
 
-@media (max-width: 414px) {
-  .volume-slider {
-    width: 48px;
-  }
+/* Fullscreen Chat Overlay */
+.fs-chat-overlay {
+  position: absolute;
+  top: 1.5rem;
+  right: 1.5rem;
+  bottom: 5.5rem;
+  width: 330px;
+  max-width: 85vw;
+  background: rgba(13, 17, 23, 0.78);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: var(--radius-lg, 12px);
+  display: flex;
+  flex-direction: column;
+  z-index: 50;
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.7);
+  pointer-events: auto;
+}
+
+.fs-chat-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.7rem 0.9rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.fs-chat-title {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--color-primary, #38bdf8);
+}
+
+.fs-chat-close-btn {
+  background: transparent;
+  border: none;
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 1.3rem;
+  cursor: pointer;
+  line-height: 1;
+  padding: 0 0.25rem;
+}
+.fs-chat-close-btn:hover {
+  color: #fff;
+}
+
+.fs-chat-messages {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.fs-chat-empty {
+  font-size: 0.78rem;
+  color: rgba(255, 255, 255, 0.4);
+  text-align: center;
+  margin-top: 2rem;
+}
+
+.fs-chat-msg {
+  font-size: 0.82rem;
+  line-height: 1.4;
+  word-break: break-word;
+}
+
+.fs-chat-msg--system {
+  font-style: italic;
+  color: rgba(255, 255, 255, 0.45);
+  font-size: 0.75rem;
+}
+
+.fs-chat-username {
+  font-weight: 600;
+  color: #38bdf8;
+  margin-right: 0.35rem;
+}
+
+.fs-chat-username--host {
+  color: #f59e0b;
+}
+
+.fs-chat-text {
+  color: rgba(255, 255, 255, 0.92);
+}
+
+.fs-chat-input-wrap {
+  display: flex;
+  gap: 0.4rem;
+  padding: 0.55rem 0.75rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(0, 0, 0, 0.35);
+  border-radius: 0 0 var(--radius-lg, 12px) var(--radius-lg, 12px);
+}
+
+.fs-chat-input {
+  flex: 1;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 6px;
+  padding: 0.45rem 0.65rem;
+  color: #fff;
+  font-size: 0.8rem;
+  outline: none;
+}
+.fs-chat-input:focus {
+  border-color: var(--color-primary, #38bdf8);
+}
+
+.fs-chat-send-btn {
+  background: var(--color-primary, #38bdf8);
+  color: #000;
+  border: none;
+  border-radius: 6px;
+  padding: 0.45rem 0.75rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
+}
+.fs-chat-send-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.ctrl-btn--active {
+  color: var(--color-primary, #38bdf8) !important;
+}
+.ctrl-btn--next-ep {
+  color: #34d399 !important;
+}
+.ctrl-btn--next-ep:hover {
+  color: #6ee7b7 !important;
+  transform: scale(1.1);
 }
 </style>

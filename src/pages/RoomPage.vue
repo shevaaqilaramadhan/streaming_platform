@@ -4,6 +4,8 @@
     <NicknameModal
       v-model="showModal"
       :room-id="roomId"
+      :requires-pin="modalRequiresPin"
+      :error-message="modalError"
       @join="onNicknameChosen"
       @close="showModal = false"
     />
@@ -17,10 +19,12 @@
         :ws-status="wsStatus"
         :participant-count="participants.length || 1"
         :is-public="isPublic"
+        :has-pin="hasPin"
         :room-name="roomName"
         @toggle-public="onTogglePublic"
         @toggle-user-list="showUserList = !showUserList"
         @set-room-name="onSetRoomName"
+        @set-room-pin="onSetRoomPin"
       />
 
       <!-- User List Panel -->
@@ -50,7 +54,7 @@
             />
             <div class="metadata-info">
               <span class="watching-label">NOW WATCHING</span>
-              <h2 class="anime-title">
+              <h2 class="anime-title" :title="currentMetadata.title || 'Stream Source'">
                 {{ currentMetadata.title || 'Stream Source' }}
               </h2>
               <span v-if="currentMetadata.episode" class="episode-info">
@@ -66,9 +70,13 @@
             :is-host="isHost"
             :video-url="playerState.videoUrl"
             :player-state="playerState"
+            :messages="messages"
+            :next-episode-url="currentMetadata?.nextEpisodeUrl || ''"
             @sync="onSyncEvent"
             @ended="onVideoEnded"
             @error="onStreamError"
+            @send-chat="onSendChat"
+            @play-next-episode="playNextEpisode"
           />
 
           <!-- Single host URL input (VideoPlayer no longer duplicates this) -->
@@ -142,6 +150,7 @@
                 :typing-users="typingUsers"
                 @send="onSendChat"
                 @typing="onTyping"
+                @react="onReaction"
               />
               <QueuePanel
                 v-else
@@ -213,6 +222,7 @@ import EmojiReactions from '../components/EmojiReactions.vue'
 
 import { useRoom } from '../composables/useRoom.js'
 import { isValidVideoInput } from '../utils/videoInput.js'
+import { API_BASE } from '../config.js'
 
 const route   = useRoute()
 const router  = useRouter()
@@ -232,12 +242,24 @@ function clearHostToken(id) {
   sessionStorage.removeItem(hostTokenStorageKey(id))
 }
 
+function pinStorageKey(id) {
+  return `wp_pin_${id}`
+}
+
+function peekPin(id) {
+  if (!id || typeof sessionStorage === 'undefined') return ''
+  return sessionStorage.getItem(pinStorageKey(id)) || ''
+}
+
 /* ---- Local State ---- */
-const nickname   = ref('')
-const showModal  = ref(true)
-const hasJoined  = ref(false)
-const isHost     = ref(false)
-let pendingHostToken = ''
+const nickname         = ref('')
+const showModal        = ref(true)
+const hasJoined        = ref(false)
+const isHost           = ref(false)
+const enteredPin       = ref('')
+const modalRequiresPin = ref(false)
+const modalError       = ref('')
+let pendingHostToken   = ''
 
 /* ---- Room composable ---- */
 let room = null
@@ -252,6 +274,8 @@ const scrapeLoading   = ref(false)
 const currentMetadata = ref(null)
 const queue           = ref([])
 const isPublic        = ref(false)
+const hasPin          = ref(false)
+const authError       = ref(null)
 const roomName        = ref('')
 const typingUsers     = ref([])
 const reactions       = ref([])
@@ -265,10 +289,11 @@ const showReconnectBanner = computed(() =>
   ['disconnected', 'reconnecting', 'connecting'].includes(wsStatus.value)
 )
 
-function initRoom() {
+function initRoom(initialPin = '') {
   const token = pendingHostToken || peekHostToken(roomId.value)
   pendingHostToken = token
-  room = useRoom(roomId.value, nickname.value, token)
+  const effectivePin = initialPin || enteredPin.value || peekPin(roomId.value)
+  room = useRoom(roomId.value, nickname.value, token, effectivePin)
 
   // 1. Setup watchers FIRST (before any state changes)
   roomWatchers.push(
@@ -281,6 +306,18 @@ function initRoom() {
     watch(room.currentMetadata, v => { currentMetadata.value = v }, { deep: true }),
     watch(room.queue,           v => { queue.value = v }, { deep: true }),
     watch(room.isPublic,        v => { isPublic.value = v }),
+    watch(room.hasPin,          v => { hasPin.value = v }),
+    watch(room.authError,       v => {
+      authError.value = v
+      if (v) {
+        modalError.value = v === 'invalid_pin' ? 'Incorrect Room PIN. Please enter the correct PIN.' : v
+        modalRequiresPin.value = true
+        showModal.value = true
+        hasJoined.value = false
+      } else {
+        modalError.value = ''
+      }
+    }),
     watch(room.isHost,          v => {
       isHost.value = v
       // Clear host token only after server confirms we are host (single-use claim done)
@@ -301,6 +338,7 @@ function initRoom() {
   currentMetadata.value = room.currentMetadata.value
   queue.value           = room.queue.value
   isPublic.value        = room.isPublic.value
+  hasPin.value          = room.hasPin.value
   isHost.value          = room.isHost.value
   hostId.value          = room.hostId.value
   localUserId.value     = room.localUserId.value
@@ -324,8 +362,29 @@ function initRoom() {
 }
 
 /* ---- Lifecycle ---- */
-onMounted(() => {
+onMounted(async () => {
   pendingHostToken = peekHostToken(roomId.value)
+  // Pre-check room details from backend
+  try {
+    const res = await fetch(`${API_BASE}/api/rooms?roomId=${encodeURIComponent(roomId.value)}`)
+    if (res.ok) {
+      const data = await res.json()
+      if (data.hasPin) {
+        hasPin.value = true
+        if (!pendingHostToken && !peekPin(roomId.value)) {
+          modalRequiresPin.value = true
+        }
+      }
+      if (data.roomName) {
+        roomName.value = data.roomName
+      }
+      if (typeof data.isPublic === 'boolean') {
+        isPublic.value = data.isPublic
+      }
+    }
+  } catch (err) {
+    console.warn('[RoomPage] Could not pre-check room:', err)
+  }
 })
 
 onUnmounted(() => {
@@ -338,11 +397,25 @@ onUnmounted(() => {
 })
 
 /* ---- Event Handlers ---- */
-function onNicknameChosen(name) {
-  nickname.value  = name
-  hasJoined.value = true
-  showModal.value = false
-  initRoom()
+function onSetRoomPin(pin) {
+  room?.setRoomPin(pin)
+}
+function onNicknameChosen(data) {
+  const chosenName = typeof data === 'string' ? data : data?.nickname
+  const chosenPin  = typeof data === 'object' ? data?.pin : ''
+  nickname.value   = chosenName
+  if (chosenPin) {
+    enteredPin.value = chosenPin
+  }
+  hasJoined.value  = true
+  showModal.value  = false
+  modalError.value = ''
+
+  if (!room) {
+    initRoom(enteredPin.value)
+  } else {
+    room.submitPinAndJoin(enteredPin.value || peekPin(roomId.value))
+  }
 }
 
 function onSyncEvent({ isPlaying, currentTime }) {
@@ -388,8 +461,17 @@ function onTogglePublic(val) {
   room?.togglePublic(val)
 }
 
+function playNextEpisode(url) {
+  const target = url || currentMetadata.value?.nextEpisodeUrl
+  if (!target || !isHost.value) return
+  room?.setVideo(target)
+}
+
 function onVideoEnded() {
   room?.onVideoEnded()
+  if (isHost.value && queue.value.length === 0 && currentMetadata.value?.nextEpisodeUrl) {
+    playNextEpisode(currentMetadata.value.nextEpisodeUrl)
+  }
 }
 
 function onStreamError(msg) {

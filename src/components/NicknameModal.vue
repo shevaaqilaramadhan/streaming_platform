@@ -32,10 +32,22 @@
               <path d="M3 9h18M9 21V9"/>
             </svg>
             Room: <strong>{{ roomId }}</strong>
+            <span v-if="requiresPin" class="pin-required-tag">
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+                <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+              </svg>
+              PIN Protected
+            </span>
           </div>
 
           <!-- Input -->
           <form @submit.prevent="handleSubmit" class="modal-form">
+            <!-- Error Alert -->
+            <div v-if="errorMessage" class="modal-error">
+              {{ errorMessage }}
+            </div>
+
             <label for="nickname-input" class="sr-only">Your nickname</label>
             <input
               id="nickname-input"
@@ -52,11 +64,25 @@
               {{ localNickname.length }}/24
             </div>
 
+            <!-- PIN Field when room is PIN-protected -->
+            <div v-if="requiresPin" class="pin-field-wrap">
+              <label for="pin-input" class="field-label">Room PIN</label>
+              <input
+                id="pin-input"
+                v-model="localPin"
+                type="password"
+                class="input"
+                placeholder="Enter room PIN"
+                maxlength="16"
+                autocomplete="off"
+              />
+            </div>
+
             <button
               id="join-room-btn"
               type="submit"
               class="btn btn-primary btn-lg"
-              :disabled="!localNickname.trim() || localNickname.trim().length < 2"
+              :disabled="!localNickname.trim() || localNickname.trim().length < 2 || (requiresPin && !localPin.trim())"
             >
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/>
@@ -76,13 +102,16 @@
 import { ref, watch, nextTick } from 'vue'
 
 const props = defineProps({
-  modelValue: { type: Boolean, default: false },
-  roomId:     { type: String, required: true },
+  modelValue:   { type: Boolean, default: false },
+  roomId:       { type: String, required: true },
+  requiresPin:  { type: Boolean, default: false },
+  errorMessage: { type: String, default: '' },
 })
 
 const emit = defineEmits(['update:modelValue', 'join', 'close'])
 
 const localNickname = ref('')
+const localPin = ref('')
 const inputRef = ref(null)
 
 watch(
@@ -96,7 +125,8 @@ watch(
 function handleSubmit() {
   const name = localNickname.value.trim()
   if (!name || name.length < 2) return
-  emit('join', name)
+  if (props.requiresPin && !localPin.value.trim()) return
+  emit('join', { nickname: name, pin: localPin.value.trim() })
   emit('update:modelValue', false)
 }
 </script>
@@ -167,6 +197,19 @@ function handleSubmit() {
   color: var(--text-primary);
   font-family: var(--font-mono);
 }
+.pin-required-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  background: rgba(245, 158, 11, 0.15);
+  border: 1px solid rgba(245, 158, 11, 0.3);
+  color: #fbbf24;
+  padding: 1px 6px;
+  border-radius: var(--radius-sm);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  margin-left: 4px;
+}
 
 .modal-form {
   width: 100%;
@@ -191,5 +234,31 @@ function handleSubmit() {
   position: absolute; width: 1px; height: 1px;
   padding: 0; margin: -1px; overflow: hidden;
   clip: rect(0,0,0,0); white-space: nowrap; border: 0;
+}
+
+.modal-error {
+  width: 100%;
+  padding: 0.5rem 0.75rem;
+  background: rgba(239, 68, 68, 0.15);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  border-radius: var(--radius-md);
+  color: #fca5a5;
+  font-size: 0.8rem;
+  text-align: center;
+}
+
+.pin-field-wrap {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.field-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
 }
 </style>

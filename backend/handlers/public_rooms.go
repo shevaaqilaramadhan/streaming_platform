@@ -41,6 +41,7 @@ func GetPublicRooms(w http.ResponseWriter, r *http.Request) {
 		}
 		roomName := room.RoomName
 		roomID := room.RoomID
+		hasPIN := room.PIN != ""
 
 		room.Mutex.RUnlock()
 
@@ -54,6 +55,7 @@ func GetPublicRooms(w http.ResponseWriter, r *http.Request) {
 			HostUsername:     hostUsername,
 			ParticipantCount: clientCount,
 			QueueSize:        queueSize,
+			HasPIN:           hasPIN,
 			CurrentMetadata:  currentMetadata,
 		}
 

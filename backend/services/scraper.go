@@ -984,6 +984,7 @@ func extractAnoboyMetadata(doc *goquery.Document, pageURL string) *models.VideoM
 		}
 	}
 
+	metadata.NextEpisodeURL = extractNextEpisodeURL(doc, pageURL)
 	return metadata
 }
 
@@ -1524,6 +1525,7 @@ func extractOtakudesuMetadata(doc *goquery.Document, pageURL string) *models.Vid
 		}
 	}
 
+	metadata.NextEpisodeURL = extractNextEpisodeURL(doc, pageURL)
 	return metadata
 }
 
@@ -1545,5 +1547,65 @@ func extractGenericMetadata(doc *goquery.Document, pageURL string) *models.Video
 		metadata.ThumbnailURL = ogImage
 	}
 
+	metadata.NextEpisodeURL = extractNextEpisodeURL(doc, pageURL)
 	return metadata
+}
+
+func extractNextEpisodeURL(doc *goquery.Document, pageURL string) string {
+	if doc == nil {
+		return ""
+	}
+	var nextLink string
+	// 1. rel="next"
+	doc.Find("a[rel='next']").Each(func(_ int, s *goquery.Selection) {
+		if nextLink == "" {
+			if href, ok := s.Attr("href"); ok {
+				href = strings.TrimSpace(href)
+				if href != "" && href != "#" && !strings.HasPrefix(href, "javascript:") {
+					nextLink = href
+				}
+			}
+		}
+	})
+	// 2. Class containing next / naveps / next-episode / flir
+	if nextLink == "" {
+		doc.Find(".nvs.rght a, .naveps .next a, a.next, a.next-episode, .flir a").Each(func(_ int, s *goquery.Selection) {
+			if nextLink == "" {
+				text := strings.ToLower(s.Text())
+				if strings.Contains(text, "next") || strings.Contains(text, "berikut") || strings.Contains(text, "selanjutnya") {
+					if href, ok := s.Attr("href"); ok {
+						href = strings.TrimSpace(href)
+						if href != "" && href != "#" && !strings.HasPrefix(href, "javascript:") {
+							nextLink = href
+						}
+					}
+				}
+			}
+		})
+	}
+	// 3. Any <a> tag with text matching Next or Episode Berikutnya
+	if nextLink == "" {
+		doc.Find("a").Each(func(_ int, s *goquery.Selection) {
+			if nextLink == "" {
+				text := strings.TrimSpace(strings.ToLower(s.Text()))
+				if text == "next" || text == "next eps" || text == "next episode" || strings.Contains(text, "eps berikutnya") || strings.Contains(text, "episode berikutnya") {
+					if href, ok := s.Attr("href"); ok {
+						href = strings.TrimSpace(href)
+						if href != "" && href != "#" && !strings.HasPrefix(href, "javascript:") {
+							nextLink = href
+						}
+					}
+				}
+			}
+		})
+	}
+	if nextLink != "" {
+		if u, err := url.Parse(nextLink); err == nil {
+			if base, err := url.Parse(pageURL); err == nil {
+				return base.ResolveReference(u).String()
+			}
+		}
+		return nextLink
+	}
+	return ""
 }

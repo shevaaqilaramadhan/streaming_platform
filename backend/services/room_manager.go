@@ -22,6 +22,11 @@ var (
 // CreateRoom creates a room and returns (roomID, hostToken).
 // hostToken is single-use: first valid JOIN_EVENT with it becomes host.
 func CreateRoom() (roomID, hostToken string) {
+	return CreateRoomWithPIN("")
+}
+
+// CreateRoomWithPIN creates a room with an optional access PIN.
+func CreateRoomWithPIN(pin string) (roomID, hostToken string) {
 	mu.Lock()
 	defer mu.Unlock()
 
@@ -36,6 +41,7 @@ func CreateRoom() (roomID, hostToken string) {
 	hostToken = utils.GenerateHostToken()
 	room := newRoom(roomID)
 	room.HostToken = hostToken
+	room.PIN = strings.TrimSpace(pin)
 	rooms[roomID] = room
 	return roomID, hostToken
 }
@@ -251,14 +257,25 @@ func SetRoomMetadata(roomID string, metadata *models.VideoMetadata) {
 	room.Mutex.Lock()
 	room.CurrentVideo = metadata.VideoURL
 	room.CurrentMetadata = &models.QueueItem{
-		ID:        "",
-		URL:       metadata.VideoURL,
-		Title:     metadata.Title,
-		Episode:   metadata.Episode,
-		Thumbnail: metadata.ThumbnailURL,
+		ID:             "",
+		URL:            metadata.VideoURL,
+		Title:          metadata.Title,
+		Episode:        metadata.Episode,
+		Thumbnail:      metadata.ThumbnailURL,
+		NextEpisodeURL: metadata.NextEpisodeURL,
 	}
 	room.CurrentTime = 0
 	room.IsPlaying = false
+	room.Mutex.Unlock()
+}
+
+func SetRoomPIN(roomID, pin string) {
+	room, exists := GetRoom(roomID)
+	if !exists {
+		return
+	}
+	room.Mutex.Lock()
+	room.PIN = strings.TrimSpace(pin)
 	room.Mutex.Unlock()
 }
 

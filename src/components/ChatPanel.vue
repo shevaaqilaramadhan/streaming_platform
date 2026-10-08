@@ -19,7 +19,7 @@
           <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1">
             <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
           </svg>
-          <p>No messages yet. Say hi! 👋</p>
+          <p>No messages yet. Say hi!</p>
         </div>
 
         <!-- Messages -->
@@ -62,6 +62,41 @@
     </div>
 
     <div class="chat-input-area" :class="{ 'chat-input-area--disabled': !isConnected }">
+      <!-- Reaction picker -->
+      <div class="react-popover-wrap">
+        <button
+          type="button"
+          class="btn btn-ghost react-toggle-btn"
+          :class="{ 'react-toggle-btn--open': showEmojiPicker }"
+          :disabled="!isConnected"
+          @click="showEmojiPicker = !showEmojiPicker"
+          title="React with emoji"
+          aria-label="Send emoji reaction"
+        >
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="10"/>
+            <path d="M8 14s1.5 2 4 2 4-2 4-2"/>
+            <line x1="9" y1="9" x2="9.01" y2="9"/>
+            <line x1="15" y1="9" x2="15.01" y2="9"/>
+          </svg>
+        </button>
+
+        <Transition name="fade">
+          <div v-if="showEmojiPicker" class="chat-emoji-popover glass-strong">
+            <button
+              v-for="emoji in EMOJIS"
+              :key="emoji"
+              type="button"
+              class="emoji-popover-item"
+              @click="handleSelectEmoji(emoji)"
+              :aria-label="'React ' + emoji"
+            >
+              {{ emoji }}
+            </button>
+          </div>
+        </Transition>
+      </div>
+
       <input
         id="chat-input"
         ref="inputRef"
@@ -94,6 +129,8 @@
 <script setup>
 import { ref, watch, nextTick, computed } from 'vue'
 
+const EMOJIS = ['😂', '🔥', '👏', '❤️', '😮', '🎉']
+
 const props = defineProps({
   messages:     { type: Array,   default: () => [] },
   isConnected:  { type: Boolean, default: false },
@@ -101,12 +138,18 @@ const props = defineProps({
   typingUsers:  { type: Array,   default: () => [] },
 })
 
-const emit = defineEmits(['send', 'typing'])
+const emit = defineEmits(['send', 'typing', 'react'])
 
-const inputText  = ref('')
-const messagesEl = ref(null)
-const inputRef   = ref(null)
-let typingDebounce = null
+const inputText       = ref('')
+const messagesEl      = ref(null)
+const inputRef        = ref(null)
+const showEmojiPicker = ref(false)
+let typingDebounce    = null
+
+function handleSelectEmoji(emoji) {
+  emit('react', emoji)
+  showEmojiPicker.value = false
+}
 
 function isNearBottom(el, threshold = 120) {
   return el.scrollHeight - el.scrollTop - el.clientHeight < threshold
@@ -348,5 +391,63 @@ const typingDisplay = computed(() => {
   padding: 0;
   border-radius: var(--radius-md);
   flex-shrink: 0;
+}
+
+.react-popover-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.react-toggle-btn {
+  width: 38px;
+  height: 38px;
+  padding: 0;
+  border-radius: var(--radius-md);
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all var(--transition-fast);
+}
+.react-toggle-btn:hover {
+  color: var(--text-primary);
+  background: rgba(255, 255, 255, 0.08);
+}
+.react-toggle-btn--open {
+  color: var(--color-primary);
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.chat-emoji-popover {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 0;
+  display: flex;
+  gap: 4px;
+  padding: 6px 8px;
+  border-radius: var(--radius-lg);
+  background: rgba(18, 18, 20, 0.95);
+  border: 1px solid var(--color-border);
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.5);
+  z-index: 50;
+}
+
+.emoji-popover-item {
+  width: 32px;
+  height: 32px;
+  border: none;
+  background: transparent;
+  font-size: 1.2rem;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform var(--transition-fast), background var(--transition-fast);
+}
+.emoji-popover-item:hover {
+  background: rgba(255, 255, 255, 0.1);
+  transform: scale(1.2);
 }
 </style>
