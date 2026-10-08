@@ -98,7 +98,6 @@
           :class="{ active: activeCategory === 'all' }"
           @click="activeCategory = 'all'"
         >
-          <span class="tab-icon">📋</span>
           All
         </button>
         <button
@@ -108,7 +107,6 @@
           :class="{ active: activeCategory === cat.id }"
           @click="activeCategory = cat.id"
         >
-          <span class="tab-icon">{{ cat.icon }}</span>
           {{ cat.label }}
         </button>
       </div>
@@ -117,7 +115,6 @@
       <div class="faq-list">
         <template v-for="cat in filteredCategories" :key="cat.id">
           <div class="faq-category-header">
-            <span class="cat-icon">{{ cat.icon }}</span>
             <h2>{{ cat.label }}</h2>
           </div>
 
@@ -188,7 +185,6 @@ const categories = [
   {
     id: 'general',
     label: 'General',
-    icon: '💡',
     items: [
       {
         q: 'What is LitcqnWatch?',
@@ -211,7 +207,6 @@ const categories = [
   {
     id: 'rooms',
     label: 'Rooms & Security',
-    icon: '🏠',
     items: [
       {
         q: 'How do I create a room?',
@@ -234,7 +229,6 @@ const categories = [
   {
     id: 'playback',
     label: 'Playback & Shortcuts',
-    icon: '🎬',
     items: [
       {
         q: 'What video formats and sites are supported?',
@@ -257,7 +251,6 @@ const categories = [
   {
     id: 'technical',
     label: 'Technical',
-    icon: '⚙️',
     items: [
       {
         q: 'What technology does LitcqnWatch use?',
@@ -276,7 +269,6 @@ const categories = [
   {
     id: 'troubleshooting',
     label: 'Troubleshooting',
-    icon: '🔧',
     items: [
       {
         q: 'The video won\'t play. What should I do?',

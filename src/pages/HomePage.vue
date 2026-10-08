@@ -697,15 +697,17 @@ const steps = [
   position: relative;
   overflow: hidden;
   flex-shrink: 0;
+  background: var(--color-surface-hover);
 }
 .mock-thumbnail::before {
-  content: '🎬';
+  content: '▶';
   position: absolute;
   inset: 0;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 0.7rem;
+  font-size: 0.65rem;
+  color: var(--color-text-muted);
 }
 .mock-meta-text {
   display: flex;

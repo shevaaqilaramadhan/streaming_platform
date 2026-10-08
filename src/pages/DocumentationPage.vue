@@ -77,7 +77,6 @@
               :class="{ active: activeSection === section.id }"
               @click.prevent="scrollToSection(section.id)"
             >
-              <span class="sidebar-link-icon">{{ section.icon }}</span>
               {{ section.title }}
             </a>
           </nav>
@@ -85,15 +84,12 @@
           <h4 class="sidebar-title">Resources</h4>
           <nav class="sidebar-nav">
             <router-link to="/faq" class="sidebar-link">
-              <span class="sidebar-link-icon">❓</span>
               FAQ
             </router-link>
             <router-link to="/status" class="sidebar-link">
-              <span class="sidebar-link-icon">📊</span>
               Server Status
             </router-link>
             <a href="https://github.com/shevaaqilaramadhan/streaming_platform" target="_blank" rel="noopener noreferrer" class="sidebar-link">
-              <span class="sidebar-link-icon">🐙</span>
               GitHub
             </a>
           </nav>
@@ -122,7 +118,6 @@
         <!-- Quick Start -->
         <section id="quick-start" class="docs-section">
           <div class="section-header">
-            <span class="section-icon">🚀</span>
             <h2>Quick Start</h2>
           </div>
           <p>Get started with LitcqnWatch in three simple steps:</p>
@@ -163,7 +158,6 @@
         <!-- Room Controls -->
         <section id="room-controls" class="docs-section">
           <div class="section-header">
-            <span class="section-icon">🎮</span>
             <h2>Room Controls</h2>
           </div>
           <p>As a <strong>host</strong>, you have full control over the playback experience. Guests can watch and chat, but only the host controls the video.</p>
@@ -176,14 +170,13 @@
             </div>
             <div class="table-row" v-for="ctrl in controls" :key="ctrl.action">
               <span class="ctrl-action">
-                <span class="ctrl-icon">{{ ctrl.icon }}</span>
                 {{ ctrl.action }}
               </span>
               <span :class="ctrl.host ? 'perm-yes' : 'perm-no'">
-                {{ ctrl.host ? '✓' : '✗' }}
+                {{ ctrl.host ? '✓' : '—' }}
               </span>
               <span :class="ctrl.guest ? 'perm-yes' : 'perm-no'">
-                {{ ctrl.guest ? '✓' : '✗' }}
+                {{ ctrl.guest ? '✓' : '—' }}
               </span>
             </div>
           </div>
@@ -192,7 +185,6 @@
         <!-- Video Sources -->
         <section id="video-sources" class="docs-section">
           <div class="section-header">
-            <span class="section-icon">🎬</span>
             <h2>Supported Video Sources</h2>
           </div>
           <p>LitcqnWatch supports multiple video source formats for maximum flexibility:</p>
@@ -276,7 +268,6 @@
         <!-- Chat & Interaction -->
         <section id="chat" class="docs-section">
           <div class="section-header">
-            <span class="section-icon">💬</span>
             <h2>Chat & Interaction</h2>
           </div>
           <p>Every room comes with a built-in real-time chat panel powered by WebSockets.</p>
@@ -321,7 +312,6 @@
         <!-- Queue System -->
         <section id="queue" class="docs-section">
           <div class="section-header">
-            <span class="section-icon">📋</span>
             <h2>Queue System</h2>
           </div>
           <p>Line up multiple videos for a seamless binge-watching experience.</p>
@@ -358,7 +348,6 @@
         <!-- Keyboard Shortcuts -->
         <section id="shortcuts" class="docs-section">
           <div class="section-header">
-            <span class="section-icon">⌨️</span>
             <h2>Keyboard Shortcuts</h2>
           </div>
           <p>Control playback faster with these keyboard shortcuts:</p>
@@ -374,7 +363,6 @@
         <!-- API Reference -->
         <section id="api" class="docs-section">
           <div class="section-header">
-            <span class="section-icon">🔌</span>
             <h2>WebSocket API</h2>
           </div>
           <p>For developers who want to build custom integrations, LitcqnWatch exposes a WebSocket API:</p>
@@ -509,23 +497,23 @@ const activeSection = ref('quick-start')
 const mobileMenuOpen = ref(false)
 
 const sections = [
-  { id: 'quick-start', title: 'Quick Start', icon: '🚀' },
-  { id: 'room-controls', title: 'Room Controls', icon: '🎮' },
-  { id: 'video-sources', title: 'Video Sources', icon: '🎬' },
-  { id: 'chat', title: 'Chat & Interaction', icon: '💬' },
-  { id: 'queue', title: 'Queue System', icon: '📋' },
-  { id: 'shortcuts', title: 'Keyboard Shortcuts', icon: '⌨️' },
-  { id: 'api', title: 'WebSocket API', icon: '🔌' },
+  { id: 'quick-start', title: 'Quick Start' },
+  { id: 'room-controls', title: 'Room Controls' },
+  { id: 'video-sources', title: 'Video Sources' },
+  { id: 'chat', title: 'Chat & Interaction' },
+  { id: 'queue', title: 'Queue System' },
+  { id: 'shortcuts', title: 'Keyboard Shortcuts' },
+  { id: 'api', title: 'WebSocket API' },
 ]
 
 const controls = [
-  { icon: '▶️', action: 'Play / Pause', host: true, guest: false },
-  { icon: '⏩', action: 'Seek', host: true, guest: false },
-  { icon: '🔊', action: 'Volume Control', host: true, guest: true },
-  { icon: '📺', action: 'Load Video URL', host: true, guest: false },
-  { icon: '📋', action: 'Manage Queue', host: true, guest: false },
-  { icon: '💬', action: 'Send Chat', host: true, guest: true },
-  { icon: '👥', action: 'Kick User', host: true, guest: false },
+  { action: 'Play / Pause', host: true, guest: false },
+  { action: 'Seek', host: true, guest: false },
+  { action: 'Volume Control', host: true, guest: true },
+  { action: 'Load Video URL', host: true, guest: false },
+  { action: 'Manage Queue', host: true, guest: false },
+  { action: 'Send Chat', host: true, guest: true },
+  { action: 'Kick User', host: true, guest: false },
 ]
 
 const shortcuts = [
