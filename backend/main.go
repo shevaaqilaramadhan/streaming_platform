@@ -17,6 +17,7 @@ import (
 
 func main() {
 	startTime := time.Now()
+	mux := http.NewServeMux()
 	mux.HandleFunc("/health", corsMiddleware(func(w http.ResponseWriter, r *http.Request) {
 		rooms, users := services.GetRoomStats()
 		w.Header().Set("Content-Type", "application/json")
