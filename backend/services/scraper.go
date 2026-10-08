@@ -152,9 +152,10 @@ func isPlayableStreamURL(u string) bool {
 		strings.HasSuffix(path, ".webm") || strings.HasSuffix(path, ".mkv") {
 		return true
 	}
-	// Common stream path markers
+	// Common stream path markers & HLS manifests
 	if strings.Contains(path, "/hls/") || strings.Contains(path, "/stream/") ||
-		strings.Contains(lower, ".m3u8") || strings.Contains(lower, ".mp4?") {
+		strings.Contains(lower, ".m3u8") || strings.Contains(lower, ".mp4?") ||
+		(strings.Contains(lower, "majorplay.net") && (strings.Contains(path, "/config-") || strings.Contains(path, "/data-"))) {
 		return true
 	}
 	return false

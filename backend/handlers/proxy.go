@@ -258,6 +258,10 @@ func defaultProxyReferer(u *url.URL) string {
 	if strings.Contains(host, "googlevideo") || strings.Contains(host, "googleusercontent") {
 		return "https://www.blogger.com/"
 	}
+	// majorplay HLS streaming requires IDLIX referer
+	if strings.Contains(host, "majorplay") || strings.Contains(host, "idlix") {
+		return "https://z2.idlixku.com/"
+	}
 	// xtwap HLS streaming requires play.xtwap.top referer
 	if strings.Contains(host, "xtwap") {
 		return "https://play.xtwap.top/"

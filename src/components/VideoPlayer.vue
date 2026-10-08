@@ -440,7 +440,12 @@ function extractYoutubeId(url) {
 function isHlsUrl(url) {
   if (!url) return false
   const clean = url.split('?')[0].split('#')[0]
-  return clean.endsWith('.m3u8')
+  if (clean.endsWith('.m3u8')) return true
+  // IDLIX / Majorplay master playlists (.json extension containing HLS #EXTM3U)
+  if (clean.includes('majorplay.net') && (clean.includes('/config-') || clean.includes('/data-'))) {
+    return true
+  }
+  return false
 }
 
 function isEmbedUrl(url) {
@@ -609,6 +614,10 @@ function getProxiedUrl(url, referer) {
       // Blogger / Anoboy streams on googlevideo require blogger referer
       if (host.includes('googlevideo') || host.includes('googleusercontent') || url.includes('videoplayback')) {
         proxied += `&referer=${encodeURIComponent('https://www.blogger.com/')}`
+      }
+      // IDLIX / majorplay streams require IDLIX referer
+      if (host.includes('majorplay') || host.includes('idlix')) {
+        proxied += `&referer=${encodeURIComponent('https://z2.idlixku.com/')}`
       }
     } catch (_) { /* ignore */ }
   }
