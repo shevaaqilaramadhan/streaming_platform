@@ -81,12 +81,23 @@
 
           <!-- Single host URL input (VideoPlayer no longer duplicates this) -->
           <div v-if="isHost" class="room-set-video glass">
+            <button
+              class="btn btn-secondary btn-sm search-trigger-btn"
+              @click="showSearchModal = true"
+              title="Search movies and anime from IDLIX & Samehadaku"
+            >
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="11" cy="11" r="8"/>
+                <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+              </svg>
+              <span>Catalog</span>
+            </button>
             <input
               id="room-video-url-input"
               v-model="setVideoUrl"
               type="url"
               class="input"
-              placeholder="YouTube, .m3u8, .mp4, or anime page URL…"
+              placeholder="Paste URL or browse catalog…"
               @keydown.enter="submitRoomVideoUrl"
             />
             <button
@@ -98,6 +109,13 @@
               Load Video
             </button>
           </div>
+
+          <!-- Search & Catalog Modal -->
+          <SearchModal
+            :is-open="showSearchModal"
+            @close="showSearchModal = false"
+            @select-video="onSelectCatalogVideo"
+          />
 
           <!-- Emoji Reactions overlay -->
           <EmojiReactions
@@ -219,6 +237,7 @@ import QueuePanel   from '../components/QueuePanel.vue'
 import NicknameModal from '../components/NicknameModal.vue'
 import UserListPanel from '../components/UserListPanel.vue'
 import EmojiReactions from '../components/EmojiReactions.vue'
+import SearchModal from '../components/SearchModal.vue'
 
 import { useRoom } from '../composables/useRoom.js'
 import { isValidVideoInput } from '../utils/videoInput.js'
@@ -284,6 +303,7 @@ const showUserList    = ref(false)
 const hostId          = ref('')
 const localUserId     = ref('')
 const setVideoUrl     = ref('')
+const showSearchModal = ref(false)
 const isConnected     = computed(() => wsStatus.value === 'connected')
 const showReconnectBanner = computed(() =>
   ['disconnected', 'reconnecting', 'connecting'].includes(wsStatus.value)
@@ -437,6 +457,12 @@ function submitRoomVideoUrl() {
   setVideoUrl.value = ''
 }
 
+function onSelectCatalogVideo(url) {
+  if (!url || !isHost.value) return
+  scrapeError.value = null
+  room?.setVideo(url)
+}
+
 function onSendChat(text) {
   room?.sendChatMessage(text)
 }
@@ -541,6 +567,12 @@ function onTyping() {
   border-radius: var(--radius-lg);
   align-items: center;
   flex-shrink: 0;
+}
+.search-trigger-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  white-space: nowrap;
 }
 .room-set-video .input {
   flex: 1;

@@ -232,7 +232,15 @@ const categories = [
     items: [
       {
         q: 'What video formats and sites are supported?',
-        a: 'LitcqnWatch supports direct <strong>MP4</strong>, <strong>HLS (.m3u8)</strong>, <strong>YouTube</strong>, as well as supported anime episode links with auto-stream resolution.',
+        a: 'LitcqnWatch supports direct <strong>MP4</strong>, <strong>HLS (.m3u8)</strong>, <strong>YouTube</strong>, as well as movies and anime from supported platforms like IDLIX and Samehadaku.',
+      },
+      {
+        q: 'How does In-App Search and Catalog work?',
+        a: 'Inside any watch room, hosts can click the <strong>"Catalog"</strong> button next to the URL input to search movies and anime series directly from IDLIX and Samehadaku without opening external tabs. For series, you can view the full episode list and load any episode with one click.',
+      },
+      {
+        q: 'How does Video Streaming Proxy & Caching work?',
+        a: 'LitcqnWatch features an in-memory high-speed segment cache with singleflight deduplication on the Go backend. When multiple friends watch the same stream simultaneously in a room, media segments are served directly from cache memory, dramatically reducing buffering latency and upstream server load.',
       },
       {
         q: 'Does LitcqnWatch support Picture-in-Picture (PiP) and Chat Overlay?',

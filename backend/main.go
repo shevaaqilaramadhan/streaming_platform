@@ -33,6 +33,8 @@ func main() {
 	mux.HandleFunc("/api/rooms", corsMiddleware(handleCreateRoom))
 	mux.HandleFunc("/api/public-rooms", corsMiddleware(handlers.GetPublicRooms))
 	mux.HandleFunc("/api/proxy", corsMiddleware(handlers.HandleStreamProxy))
+	mux.HandleFunc("/api/search", corsMiddleware(handlers.HandleSearch))
+	mux.HandleFunc("/api/catalog/episodes", corsMiddleware(handlers.HandleCatalogEpisodes))
 	mux.HandleFunc("/ws/", corsMiddleware(handlers.HandleWebSocket))
 
 	services.StartRoomCleanup(10 * time.Minute)

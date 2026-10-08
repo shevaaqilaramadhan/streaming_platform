@@ -469,6 +469,40 @@
           </div>
         </section>
 
+        <!-- Search Catalog & Caching Architecture -->
+        <section id="catalog-caching" class="docs-section">
+          <div class="section-header">
+            <h2>Catalog & Caching Engine</h2>
+          </div>
+          <p>LitcqnWatch integrates a federated search catalog and high-performance stream segment cache to provide an all-in-one streaming experience without buffering stalls.</p>
+
+          <div class="feature-list">
+            <div class="feature-item glass">
+              <div class="feature-check">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                  <circle cx="11" cy="11" r="8"/>
+                  <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+                </svg>
+              </div>
+              <div>
+                <h4>In-App Search & Catalog</h4>
+                <p>Hosts can search titles across IDLIX and Samehadaku without leaving the watch room. The search modal presents normalized posters, release years, and episodic listings with 1-click loading.</p>
+              </div>
+            </div>
+            <div class="feature-item glass">
+              <div class="feature-check">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                  <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
+                </svg>
+              </div>
+              <div>
+                <h4>Edge Sliding Segment Cache</h4>
+                <p>HLS video segments (.ts, .m4s) are cached in backend RAM with singleflight deduplication. Multiple users watching in the same room share stream segments, cutting upstream requests and network latency by up to 90%.</p>
+              </div>
+            </div>
+          </div>
+        </section>
+
         <!-- Back to top -->
         <div class="docs-footer-nav">
           <router-link to="/" class="btn btn-ghost">
@@ -504,6 +538,7 @@ const sections = [
   { id: 'queue', title: 'Queue System' },
   { id: 'shortcuts', title: 'Keyboard Shortcuts' },
   { id: 'api', title: 'WebSocket API' },
+  { id: 'catalog-caching', title: 'Catalog & Caching' },
 ]
 
 const controls = [

@@ -161,6 +161,94 @@ func HandleStreamProxy(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	isSegment := services.IsCacheableSegment(targetURL)
+	cacheKey := targetURL + "|" + r.Header.Get("Range")
+
+	// 1. Fast Cache HIT path for HLS chunks
+	if isSegment {
+		if cached, ok := services.GetCachedSegment(cacheKey); ok {
+			for k, values := range cached.Headers {
+				for _, v := range values {
+					w.Header().Add(k, v)
+				}
+			}
+			w.Header().Set("X-Litcqn-Cache", "HIT")
+			w.Header().Set("Access-Control-Allow-Origin", "*")
+			w.Header().Set("Access-Control-Allow-Methods", "GET, OPTIONS")
+			w.Header().Set("Access-Control-Allow-Headers", "Range")
+			w.Header().Set("Access-Control-Expose-Headers", "Content-Range, Content-Length, Content-Type, Accept-Ranges, X-Litcqn-Cache")
+			w.WriteHeader(cached.StatusCode)
+			w.Write(cached.Body)
+			return
+		}
+	}
+
+	// 2. Fetch upstream with singleflight for simultaneous room members
+	fetchUpstream := func() (*services.CachedSegment, error) {
+		req, err := http.NewRequestWithContext(r.Context(), "GET", targetURL, nil)
+		if err != nil {
+			return nil, err
+		}
+		req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36")
+		req.Header.Set("Referer", referer)
+		if origin := originFromReferer(referer, parsed); origin != "" {
+			req.Header.Set("Origin", origin)
+		}
+		if rangeHeader := r.Header.Get("Range"); rangeHeader != "" {
+			req.Header.Set("Range", rangeHeader)
+		}
+
+		resp, err := proxyClient.Do(req)
+		if err != nil {
+			return nil, err
+		}
+		defer resp.Body.Close()
+
+		hdrs := make(http.Header)
+		for key, values := range resp.Header {
+			lk := strings.ToLower(key)
+			if lk == "transfer-encoding" || lk == "connection" || lk == "keep-alive" {
+				continue
+			}
+			for _, value := range values {
+				hdrs.Add(key, value)
+			}
+		}
+
+		bodyBytes, err := io.ReadAll(io.LimitReader(resp.Body, 8*1024*1024))
+		if err != nil {
+			return nil, err
+		}
+
+		seg := &services.CachedSegment{
+			Body:        bodyBytes,
+			ContentType: resp.Header.Get("Content-Type"),
+			StatusCode:  resp.StatusCode,
+			Headers:     hdrs,
+		}
+		return seg, nil
+	}
+
+	if isSegment {
+		cachedSeg, err := services.DoWithSingleflight(cacheKey, fetchUpstream)
+		if err == nil && cachedSeg != nil && cachedSeg.StatusCode >= 200 && cachedSeg.StatusCode < 300 {
+			services.PutCachedSegment(cacheKey, cachedSeg)
+			for k, values := range cachedSeg.Headers {
+				for _, v := range values {
+					w.Header().Add(k, v)
+				}
+			}
+			w.Header().Set("X-Litcqn-Cache", "MISS")
+			w.Header().Set("Access-Control-Allow-Origin", "*")
+			w.Header().Set("Access-Control-Allow-Methods", "GET, OPTIONS")
+			w.Header().Set("Access-Control-Allow-Headers", "Range")
+			w.Header().Set("Access-Control-Expose-Headers", "Content-Range, Content-Length, Content-Type, Accept-Ranges, X-Litcqn-Cache")
+			w.WriteHeader(cachedSeg.StatusCode)
+			w.Write(cachedSeg.Body)
+			return
+		}
+	}
+
 	req, err := http.NewRequestWithContext(r.Context(), "GET", targetURL, nil)
 	if err != nil {
 		http.Error(w, "Failed to create request", http.StatusInternalServerError)
@@ -168,12 +256,6 @@ func HandleStreamProxy(w http.ResponseWriter, r *http.Request) {
 	}
 
 	req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36")
-
-	referer := r.URL.Query().Get("referer")
-	if referer == "" {
-		// CDN hosts often require the anime-site origin, not the storage host
-		referer = defaultProxyReferer(parsed)
-	}
 	req.Header.Set("Referer", referer)
 	if origin := originFromReferer(referer, parsed); origin != "" {
 		req.Header.Set("Origin", origin)
@@ -205,7 +287,6 @@ func HandleStreamProxy(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Access-Control-Allow-Methods", "GET, OPTIONS")
 	w.Header().Set("Access-Control-Allow-Headers", "Range")
 	w.Header().Set("Access-Control-Expose-Headers", "Content-Range, Content-Length, Content-Type, Accept-Ranges")
-	// Help browsers seek progressive MP4 even if upstream omitted the header
 	if w.Header().Get("Accept-Ranges") == "" {
 		w.Header().Set("Accept-Ranges", "bytes")
 	}
