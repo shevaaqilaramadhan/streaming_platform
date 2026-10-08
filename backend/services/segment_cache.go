@@ -1,7 +1,6 @@
 package services
 
 import (
-	"log"
 	"net/http"
 	"net/url"
 	"strings"
