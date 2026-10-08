@@ -16,11 +16,19 @@ import (
 )
 
 func main() {
-	mux := http.NewServeMux()
-	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
+	startTime := time.Now()
+	mux.HandleFunc("/health", corsMiddleware(func(w http.ResponseWriter, r *http.Request) {
+		rooms, users := services.GetRoomStats()
+		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("OK"))
-	})
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"status":    "healthy",
+			"uptimeSec": int(time.Since(startTime).Seconds()),
+			"rooms":     rooms,
+			"users":     users,
+			"timestamp": time.Now().Unix(),
+		})
+	}))
 	mux.HandleFunc("/api/rooms", corsMiddleware(handleCreateRoom))
 	mux.HandleFunc("/api/public-rooms", corsMiddleware(handlers.GetPublicRooms))
 	mux.HandleFunc("/api/proxy", corsMiddleware(handlers.HandleStreamProxy))

@@ -258,15 +258,45 @@ func resolveSamehaEmbed(embedURL, pageURL string) (string, error) {
 	return "", fmt.Errorf("could not resolve embed: %s", truncateURL(embedURL, 80))
 }
 
-// scrapeSamehadaku resolves streams via WP player_ajax (no headless required).
+// scrapeSamehadaku resolves streams via direct embedded iframe or WP player_ajax.
 func scrapeSamehadaku(pageURL string) (*models.VideoMetadata, error) {
-	log.Printf("[Samehadaku] Scraping via player_ajax: %s", pageURL)
+	log.Printf("[Samehadaku] Scraping: %s", pageURL)
 
 	html, err := fetchPageHTML(pageURL, "")
 	if err != nil {
 		// Fall back to generic then headless only if page fetch fails
 		log.Printf("[Samehadaku] page fetch failed: %v — trying generic/headless", err)
 		return scrapeSamehadakuFallback(pageURL)
+	}
+
+	// Layer 0: Check for direct iframe in page (e.g. Blogger / Blogspot embed already rendered)
+	doc, docErr := goquery.NewDocumentFromReader(strings.NewReader(html))
+	if docErr == nil {
+		directIframeSrc := ""
+		doc.Find(".player-embed iframe, #pembed iframe, #player-frame-wrapper iframe, .video-content iframe").Each(func(_ int, s *goquery.Selection) {
+			if src, exists := s.Attr("src"); exists && src != "" && directIframeSrc == "" {
+				directIframeSrc = normalizeURL(src, pageURL)
+			}
+		})
+		if directIframeSrc == "" {
+			if match := samehaIframeSrcRe.FindStringSubmatch(html); len(match) > 1 {
+				directIframeSrc = normalizeURL(match[1], pageURL)
+			}
+		}
+
+		if directIframeSrc != "" {
+			log.Printf("[Samehadaku] Found direct iframe in page: %s", truncateURL(directIframeSrc, 100))
+			streamURL, err := resolveSamehaEmbed(directIframeSrc, pageURL)
+			if err == nil && isPlayableStreamURL(streamURL) {
+				meta := extractSamehaMetadata(html, pageURL)
+				meta.VideoURL = streamURL
+				meta.Source = "samehadaku"
+				RegisterStreamMetadata(meta.VideoURL, meta.ThumbnailURL)
+				RegisterStreamURLs(directIframeSrc)
+				log.Printf("[Samehadaku] SUCCESS via direct iframe → %s", truncateURL(streamURL, 100))
+				return meta, nil
+			}
+		}
 	}
 
 	mirrors := parseSamehaPlayerOptions(html)
@@ -372,5 +402,6 @@ func extractSamehaMetadata(html, pageURL string) *models.VideoMetadata {
 	if ep := strings.TrimSpace(doc.Find("[itemprop='episodeNumber']").First().Text()); ep != "" {
 		meta.Episode = "Episode " + ep
 	}
+	meta.NextEpisodeURL = extractNextEpisodeURL(doc, pageURL)
 	return meta
 }

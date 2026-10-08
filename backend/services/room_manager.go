@@ -315,3 +315,17 @@ func GetRoomState(roomID string) (string, float64, bool, []models.Participant, *
 
 	return room.CurrentVideo, room.CurrentTime, room.IsPlaying, participants, metadata, queueCopy
 }
+
+// GetRoomStats returns the total number of rooms and total active participants.
+func GetRoomStats() (roomCount, userCount int) {
+	mu.RLock()
+	defer mu.RUnlock()
+	roomCount = len(rooms)
+	for _, r := range rooms {
+		r.Mutex.RLock()
+		userCount += len(r.Clients)
+		r.Mutex.RUnlock()
+	}
+	return roomCount, userCount
+}
+

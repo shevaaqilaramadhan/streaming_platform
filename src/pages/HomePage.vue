@@ -7,13 +7,13 @@
           <rect x="1" y="1" width="22" height="22" rx="5" stroke="currentColor" stroke-width="1.5"/>
           <polygon points="10,7 18,12 10,17" fill="currentColor"/>
         </svg>
-        <span>WatchParty</span>
+        <span>LitcqnWatch</span>
       </router-link>
       <nav class="nav-links" :class="{ 'nav-links--open': mobileMenuOpen }" aria-label="Main">
         <router-link to="/docs" class="nav-link" @click="mobileMenuOpen = false">Docs</router-link>
         <router-link to="/faq" class="nav-link" @click="mobileMenuOpen = false">FAQ</router-link>
         <router-link to="/status" class="nav-link" @click="mobileMenuOpen = false">Status</router-link>
-        <a href="https://github.com/litcq/streaming_platform" target="_blank" rel="noopener noreferrer" class="nav-link">GitHub</a>
+        <a href="https://github.com/shevaaqilaramadhan/streaming_platform" target="_blank" rel="noopener noreferrer" class="nav-link">GitHub</a>
       </nav>
       <div class="nav-right">
         <ThemeToggle />
@@ -105,7 +105,7 @@
                   <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
                   <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
                 </svg>
-                <span>watchparty.live/room/anime-night</span>
+                <span>litcqnwatch.web.id/room/anime-night</span>
               </div>
             </div>
 
@@ -258,17 +258,17 @@
         <div class="footer-top">
           <div class="footer-brand">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><rect x="1" y="1" width="22" height="22" rx="5" stroke="currentColor" stroke-width="1.5" opacity="0.4"/><polygon points="10,7 18,12 10,17" fill="currentColor" opacity="0.4"/></svg>
-            <span>WatchParty</span>
+            <span>LitcqnWatch</span>
           </div>
           <div class="footer-links">
             <router-link to="/docs">Docs</router-link>
             <router-link to="/faq">FAQ</router-link>
             <router-link to="/status">Status</router-link>
-            <a href="https://github.com/litcq/streaming_platform" target="_blank" rel="noopener">GitHub</a>
+            <a href="https://github.com/shevaaqilaramadhan/streaming_platform" target="_blank" rel="noopener">GitHub</a>
           </div>
         </div>
         <div class="footer-bottom">
-          <p>© 2026 WatchParty. All rights reserved.</p>
+          <p>© 2026 LitcqnWatch. All rights reserved.</p>
         </div>
       </div>
     </footer>

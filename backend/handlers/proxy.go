@@ -3,6 +3,7 @@ package handlers
 import (
 	"bufio"
 	"context"
+	"crypto/tls"
 	"fmt"
 	"io"
 	"log"
@@ -40,6 +41,9 @@ var (
 		// Header wait only — body stream for progressive MP4 can take minutes
 		ResponseHeaderTimeout: 20 * time.Second,
 		ExpectContinueTimeout: 1 * time.Second,
+		TLSClientConfig: &tls.Config{
+			InsecureSkipVerify: true,
+		},
 	}
 
 	// Timeout MUST be 0 for progressive MP4 (Sokuja ~80–100MB). A 30s overall
@@ -70,8 +74,8 @@ var (
 		// Otakudesu / Anoboy HLS CDN (rotating subdomains: *.acek-cdn.com)
 		"acek-cdn.com",
 		"otakudesu.blog", "otakudesu.moe", "otakudesu.cloud",
-		"anoboy.si", "anoboy.vip", "anoboy.live",
-		"samehadaku.care", "samehadaku.win", "samehadaku.day",
+		"anoboy.si", "anoboy.vip", "anoboy.live", "anoboy.be",
+		"samehadaku.care", "samehadaku.win", "samehadaku.day", "samehadaku.how",
 		"sokuja.uk",
 		"animasu.me", "kuronime.vip", "nanime.tv",
 		"idlix.com", "idlix.asia", "idlixku.com", "nontonanimeid.com",
@@ -80,7 +84,7 @@ var (
 		"krakenfiles.com", "pixeldrain.com", "fembed.com", "vanfem.com",
 		"cybervynx.com", "rabbitstream.net", "megacloud.tv", "rapid-cloud.com",
 		"shadowlandschronicles.com", "dokicloud.one", "cloudnestra.com",
-		"wibufile.com",
+		"wibufile.com", "mega.nz",
 		"youtube.com", "youtu.be", "ytimg.com", "vimeo.com",
 		"tmdb.org", "themoviedb.org", "image.tmdb.org",
 	}
@@ -212,10 +216,26 @@ func HandleStreamProxy(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.WriteHeader(resp.StatusCode)
-	if _, err := io.Copy(w, io.LimitReader(resp.Body, maxProxyStreamBytes)); err != nil {
-		// Client navigated away / canceled — normal for long progressive streams
-		if r.Context().Err() == nil {
-			log.Printf("[Proxy] stream copy error for %s: %v", targetURL, err)
+
+	// Stream with immediate flushing to prevent player buffering stalls
+	flusher, _ := w.(http.Flusher)
+	buf := make([]byte, 32*1024) // 32KB chunks for low latency
+	limitReader := io.LimitReader(resp.Body, maxProxyStreamBytes)
+	for {
+		n, err := limitReader.Read(buf)
+		if n > 0 {
+			if _, wErr := w.Write(buf[:n]); wErr != nil {
+				break
+			}
+			if flusher != nil {
+				flusher.Flush()
+			}
+		}
+		if err != nil {
+			if err != io.EOF && r.Context().Err() == nil {
+				log.Printf("[Proxy] stream copy error for %s: %v", targetURL, err)
+			}
+			break
 		}
 	}
 }

@@ -7,7 +7,7 @@
           <rect x="1" y="1" width="22" height="22" rx="5" stroke="currentColor" stroke-width="1.5"/>
           <polygon points="10,7 18,12 10,17" fill="currentColor"/>
         </svg>
-        <span class="logo-name">WatchParty</span>
+        <span class="logo-name">LitcqnWatch</span>
       </div>
 
       <div class="divider"></div>

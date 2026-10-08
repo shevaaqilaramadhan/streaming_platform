@@ -596,6 +596,17 @@ function initHls(url) {
 
   if (Hls.isSupported()) {
     hlsInstance = new Hls({
+      enableWorker: true,
+      lowLatencyMode: false,
+      maxBufferLength: 30,
+      maxMaxBufferLength: 60,
+      maxBufferSize: 60 * 1000 * 1000,
+      backBufferLength: 30,
+      manifestLoadingTimeOut: 15000,
+      manifestLoadingMaxRetry: 4,
+      levelLoadingTimeOut: 15000,
+      fragLoadingTimeOut: 20000,
+      fragLoadingMaxRetry: 4,
       xhrSetup: (xhr, url) => {
         try {
           const parsed = new URL(url)

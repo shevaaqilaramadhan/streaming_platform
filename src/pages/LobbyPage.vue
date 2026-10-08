@@ -7,7 +7,7 @@
           <rect x="1" y="1" width="22" height="22" rx="5" stroke="currentColor" stroke-width="1.5"/>
           <polygon points="10,7 18,12 10,17" fill="currentColor"/>
         </svg>
-        <span class="nav-brand">WatchParty</span>
+        <span class="nav-brand">LitcqnWatch</span>
       </div>
       <div class="nav-right">
         <router-link to="/" class="nav-link">Home</router-link>

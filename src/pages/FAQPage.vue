@@ -7,7 +7,7 @@
           <rect x="2" y="2" width="24" height="24" rx="6" fill="#fff" fill-opacity="0.08" stroke="#fff" stroke-width="1.2" stroke-opacity="0.2"/>
           <polygon points="12,9 21,14 12,19" fill="#fff" fill-opacity="0.7"/>
         </svg>
-        <span class="nav-brand">WatchParty</span>
+        <span class="nav-brand">LitcqnWatch</span>
       </router-link>
       <nav class="nav-links" :class="{ 'nav-links--open': mobileMenuOpen }" aria-label="Main">
         <router-link to="/docs" class="nav-link" @click="mobileMenuOpen = false">
@@ -30,7 +30,7 @@
           </svg>
           Status
         </router-link>
-        <a href="https://github.com/litcq/streaming_platform" target="_blank" rel="noopener noreferrer" class="nav-link" @click="mobileMenuOpen = false">
+        <a href="https://github.com/shevaaqilaramadhan/streaming_platform" target="_blank" rel="noopener noreferrer" class="nav-link" @click="mobileMenuOpen = false">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
             <path d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12"/>
           </svg>
@@ -68,7 +68,7 @@
           Frequently Asked <span class="gradient-text">Questions</span>
         </h1>
         <p class="faq-hero-subtitle">
-          Find answers to the most common questions about WatchParty.
+          Find answers to the most common questions about LitcqnWatch.
           Can't find what you're looking for? Reach out on GitHub.
         </p>
       </div>
@@ -163,7 +163,7 @@
           <h3>Still have questions?</h3>
           <p>Can't find the answer you're looking for? Open an issue on our GitHub repository.</p>
         </div>
-        <a href="https://github.com/litcq/streaming_platform/issues" target="_blank" rel="noopener noreferrer" class="btn btn-primary">
+        <a href="https://github.com/shevaaqilaramadhan/streaming_platform/issues" target="_blank" rel="noopener noreferrer" class="btn btn-primary">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M15 22v-4a4.8 4.8 0 0 0-1-3.5c3 0 6-2 6-5.5.08-1.25-.27-2.48-1-3.5.28-1.15.28-2.35 0-3.5 0 0-1 0-3 1.5-2.64-.5-5.36-.5-8 0C6 2 5 2 5 2c-.3 1.15-.3 2.35 0 3.5A5.403 5.403 0 0 0 4 9c0 3.5 3 5.5 6 5.5-.39.49-.68 1.05-.85 1.65-.17.6-.22 1.23-.15 1.85v4"/>
             <path d="M9 18c-4.51 2-5-2-7-2"/>
@@ -191,74 +191,66 @@ const categories = [
     icon: '💡',
     items: [
       {
-        q: 'What is WatchParty?',
-        a: 'WatchParty is a free, open-source platform that lets you watch videos together with friends in perfect synchronization. Create a room, share the link, and everyone watches the same video at the same time — no account or installation required.',
+        q: 'What is LitcqnWatch?',
+        a: 'LitcqnWatch is a fast, lightweight platform that lets you watch anime, YouTube, and direct video links together with friends in perfect synchronization — no account or app installation required.',
       },
       {
         q: 'Do I need to create an account?',
-        a: 'No! WatchParty is completely account-free. Just create a room, pick a nickname, and start watching. Guests simply enter their name when joining a room.',
+        a: 'No! LitcqnWatch is completely account-free. Simply enter a room name and your nickname, or click a shared room link to join immediately.',
       },
       {
-        q: 'Is WatchParty free to use?',
-        a: 'Yes, WatchParty is 100% free and open-source. There are no premium tiers, no ads, and no hidden fees. The source code is available on GitHub.',
+        q: 'Is LitcqnWatch free to use?',
+        a: 'Yes, LitcqnWatch is 100% free and open-source. The full repository is available on GitHub.',
       },
       {
         q: 'What browsers are supported?',
-        a: 'WatchParty works on all modern browsers including Chrome, Firefox, Safari, and Edge. We recommend using the latest version of your browser for the best experience.',
+        a: 'LitcqnWatch works on all modern browsers including Chrome, Firefox, Safari, Edge, Brave, and mobile web browsers.',
       },
     ],
   },
   {
     id: 'rooms',
-    label: 'Rooms',
+    label: 'Rooms & Security',
     icon: '🏠',
     items: [
       {
         q: 'How do I create a room?',
-        a: 'Simply click the <strong>"Create Watch Room"</strong> button on the homepage. A unique room link will be generated automatically. Share this link with friends to invite them.',
+        a: 'Click <strong>"Create Watch Room"</strong> on the home page. A unique room URL is created instantly for you to share with friends.',
+      },
+      {
+        q: 'Can I protect my room with a PIN code?',
+        a: 'Yes! Hosts can set a 4–6 digit security PIN in the Room Settings modal. Any guest who wants to join must enter the correct PIN.',
       },
       {
         q: 'How many people can join a room?',
-        a: 'There\'s no hard limit on participants. However, for the best experience, we recommend rooms of up to 20 people. Larger rooms may experience slight chat delays depending on network conditions.',
-      },
-      {
-        q: 'Can I set a room name?',
-        a: 'Yes! When you create a room, you can give it a custom name. This name will be visible to all participants and in the public lobby listing.',
-      },
-      {
-        q: 'How do I share my room?',
-        a: 'Copy the URL from your browser\'s address bar and share it via any messaging app, social media, or email. Anyone with the link can join directly.',
+        a: 'There is no hard limit on participants. Rooms of 10 to 30 people run smoothly with instant chat delivery and playback synchronization.',
       },
       {
         q: 'Are rooms public or private?',
-        a: 'Rooms can be either. By default, rooms are private (only accessible via direct link). Public rooms appear in the lobby for anyone to discover and join.',
+        a: 'Rooms are private by default (accessible only via link or PIN). Hosts can toggle rooms to Public in Room Settings to list them in the Public Lobby.',
       },
     ],
   },
   {
     id: 'playback',
-    label: 'Playback',
+    label: 'Playback & Shortcuts',
     icon: '🎬',
     items: [
       {
-        q: 'What video formats are supported?',
-        a: 'WatchParty supports <strong>MP4</strong> direct links, <strong>HLS streams</strong> (.m3u8), and <strong>YouTube</strong> videos. Just paste the URL into the video input field in your room.',
+        q: 'What video formats and sites are supported?',
+        a: 'LitcqnWatch supports direct <strong>MP4</strong>, <strong>HLS (.m3u8)</strong>, <strong>YouTube</strong>, as well as supported anime episode links with auto-stream resolution.',
       },
       {
-        q: 'How does the synchronization work?',
-        a: 'The host\'s playback state (play, pause, seek position) is broadcast to all participants via WebSockets in real-time. When the host plays, pauses, or seeks, everyone\'s video follows within milliseconds.',
+        q: 'Does LitcqnWatch support Picture-in-Picture (PiP) and Chat Overlay?',
+        a: 'Yes! Press <kbd>P</kbd> or click the PiP button to pop out native Picture-in-Picture video. In fullscreen mode, press <kbd>C</kbd> or click the Overlay button to toggle transparent floating chat.',
+      },
+      {
+        q: 'How does Next Episode work?',
+        a: 'When watching episodic content, LitcqnWatch automatically detects the next episode link and displays a convenient "Next Episode" button when the video approaches its end.',
       },
       {
         q: 'Who controls the video playback?',
-        a: 'Only the <strong>host</strong> (the person who created the room) can control playback. This prevents conflicts from multiple people trying to control the video at once. Guests can adjust their own volume and toggle fullscreen.',
-      },
-      {
-        q: 'What happens if the host leaves?',
-        a: 'If the host disconnects, the room continues to exist for a period of time. Another participant may be promoted to host, or the room will close after a timeout if no host returns.',
-      },
-      {
-        q: 'Can I add multiple videos to a queue?',
-        a: 'Yes! Use the queue feature to add multiple video URLs. Videos will play in order automatically, perfect for binge-watching sessions.',
+        a: 'Only the room <strong>host</strong> controls playback (play, pause, seek, and video selection) to avoid desync conflicts. Hosts can transfer host privileges to any participant.',
       },
     ],
   },
@@ -268,20 +260,16 @@ const categories = [
     icon: '⚙️',
     items: [
       {
-        q: 'What technology does WatchParty use?',
-        a: 'WatchParty is built with <strong>Vue 3</strong> and <strong>Vite</strong> on the frontend, and <strong>Go</strong> on the backend. Real-time communication is handled via <strong>WebSockets</strong>, and video streaming uses <strong>HLS.js</strong> for adaptive bitrate support.',
+        q: 'What technology does LitcqnWatch use?',
+        a: 'LitcqnWatch is built with <strong>Vue 3</strong> and <strong>Vite</strong> on the frontend, and <strong>Go</strong> with high-performance WebSockets and stream proxying on the backend.',
       },
       {
-        q: 'Is my data collected?',
-        a: 'WatchParty collects minimal data. We don\'t require accounts, and chat messages are only stored in memory during the session. No personal data is persisted to databases. See our Privacy Policy for details.',
+        q: 'Is my data collected or stored?',
+        a: 'No. LitcqnWatch collects zero personal data. All room states and chats exist strictly in server memory during the watch session.',
       },
       {
-        q: 'Can I self-host WatchParty?',
-        a: 'Yes! WatchParty is fully open-source. You can clone the repository from GitHub and run it on your own server. Check the README for setup instructions using Docker or manual installation.',
-      },
-      {
-        q: 'Is there an API for integration?',
-        a: 'WatchParty exposes a WebSocket API for real-time events (play, pause, seek, chat). Check the <a href="/docs" style="color: var(--color-primary);">Documentation</a> page for API details and event schemas.',
+        q: 'Can I self-host LitcqnWatch?',
+        a: 'Yes! LitcqnWatch is open-source. You can clone the repo from GitHub and host the backend in Go and frontend on Vercel or any static host.',
       },
     ],
   },
