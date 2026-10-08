@@ -16,6 +16,10 @@ import (
 
 func main() {
 	mux := http.NewServeMux()
+	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte("OK"))
+	})
 	mux.HandleFunc("/api/rooms", corsMiddleware(handleCreateRoom))
 	mux.HandleFunc("/api/public-rooms", corsMiddleware(handlers.GetPublicRooms))
 	mux.HandleFunc("/api/proxy", corsMiddleware(handlers.HandleStreamProxy))
@@ -24,6 +28,9 @@ func main() {
 	services.StartRoomCleanup(10 * time.Minute)
 
 	addr := ":8080"
+	if p := os.Getenv("PORT"); p != "" {
+		addr = ":" + p
+	}
 	if v := os.Getenv("LISTEN_ADDR"); v != "" {
 		addr = v
 	}
@@ -64,7 +71,7 @@ func corsMiddleware(next http.HandlerFunc) http.HandlerFunc {
 			w.Header().Set("Vary", "Origin")
 		}
 		w.Header().Set("Access-Control-Allow-Methods", "POST, GET, OPTIONS")
-		w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Range, Authorization")
 		if r.Method == http.MethodOptions {
 			w.WriteHeader(http.StatusOK)
 			return

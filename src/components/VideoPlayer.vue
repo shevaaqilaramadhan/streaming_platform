@@ -223,6 +223,7 @@
 <script setup>
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import Hls from 'hls.js'
+import { API_BASE } from '../config.js'
 
 const props = defineProps({
   isHost:      { type: Boolean, default: false },
@@ -424,10 +425,11 @@ function sanitizeStreamUrl(url) {
 function getProxiedUrl(url, referer) {
   if (!url) return url
   if (url.startsWith('/api/proxy')) return url
+  if (API_BASE && url.startsWith(`${API_BASE}/api/proxy`)) return url
   // Relative URL from hls.js segment — already handled by m3u8 rewriter on backend
   if (!url.startsWith('http')) return url
   url = sanitizeStreamUrl(url)
-  let proxied = `/api/proxy?url=${encodeURIComponent(url)}`
+  let proxied = `${API_BASE}/api/proxy?url=${encodeURIComponent(url)}`
   if (referer) {
     proxied += `&referer=${encodeURIComponent(referer)}`
   } else {

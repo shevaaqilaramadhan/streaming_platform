@@ -23,7 +23,7 @@ const (
 
 var (
 	nanoProxyHTTPURL = os.Getenv("NANOPROXY_HTTP_URL")
-	proxyPublicBase  = strings.TrimRight(os.Getenv("PROXY_PUBLIC_BASE"), "/")
+	proxyPublicBase  = parsePublicBase(os.Getenv("PROXY_PUBLIC_BASE"))
 
 	proxyDialer = &net.Dialer{
 		Timeout:   10 * time.Second,
@@ -85,6 +85,19 @@ var (
 		"tmdb.org", "themoviedb.org", "image.tmdb.org",
 	}
 )
+
+func parsePublicBase(raw string) string {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return ""
+	}
+	for _, sep := range []string{"\n", "\r", ","} {
+		if i := strings.Index(raw, sep); i >= 0 {
+			raw = strings.TrimSpace(raw[:i])
+		}
+	}
+	return strings.TrimRight(raw, "/")
+}
 
 func init() {
 	if nanoProxyHTTPURL != "" {

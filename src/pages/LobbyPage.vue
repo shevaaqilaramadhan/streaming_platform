@@ -107,6 +107,7 @@
 import { ref, onMounted, onUnmounted, onDeactivated } from 'vue'
 import { useRouter } from 'vue-router'
 import ThemeToggle from '../components/ThemeToggle.vue'
+import { API_BASE } from '../config.js'
 
 const router = useRouter()
 const rooms = ref([])
@@ -123,7 +124,7 @@ function stopPolling() {
 
 async function fetchPublicRooms() {
   try {
-    const res = await fetch('/api/public-rooms')
+    const res = await fetch(`${API_BASE}/api/public-rooms`)
     if (res.ok) {
       rooms.value = await res.json()
       error.value = null

@@ -27,7 +27,7 @@ func loadAllowedOrigins() map[string]struct{} {
 		return out
 	}
 	for _, part := range strings.Split(raw, ",") {
-		part = strings.TrimSpace(part)
+		part = strings.TrimRight(strings.TrimSpace(part), "/")
 		if part != "" {
 			out[part] = struct{}{}
 		}

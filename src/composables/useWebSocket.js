@@ -12,13 +12,7 @@
  */
 
 import { ref, onUnmounted } from 'vue'
-
-/** WebSocket URL builder — uses same host so Vite proxy forwards to Go backend */
-function getWsBase() {
-  const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
-  return `${proto}//${window.location.host}`
-}
-const WS_BASE = import.meta.env.VITE_WS_URL || getWsBase()
+import { WS_BASE } from '../config.js'
 
 const WS_STATUS = {
   CONNECTING: 'connecting',

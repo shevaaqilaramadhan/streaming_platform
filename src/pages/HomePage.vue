@@ -244,6 +244,7 @@
 import { ref, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import ThemeToggle from '../components/ThemeToggle.vue'
+import { API_BASE } from '../config.js'
 
 const router = useRouter()
 const route = useRoute()
@@ -273,7 +274,7 @@ async function createRoom() {
   isCreating.value = true
   errorMsg.value = ''
   try {
-    const res = await fetch('/api/rooms', { method: 'POST' })
+    const res = await fetch(`${API_BASE}/api/rooms`, { method: 'POST' })
     if (!res.ok) throw new Error('Server error')
     const data = await res.json()
     if (data.hostToken && typeof sessionStorage !== 'undefined') {
