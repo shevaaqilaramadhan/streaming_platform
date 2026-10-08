@@ -161,6 +161,11 @@ func HandleStreamProxy(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	referer := r.URL.Query().Get("referer")
+	if referer == "" {
+		referer = defaultProxyReferer(parsed)
+	}
+
 	isSegment := services.IsCacheableSegment(targetURL)
 	cacheKey := targetURL + "|" + r.Header.Get("Range")
 
