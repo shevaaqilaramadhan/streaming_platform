@@ -58,15 +58,16 @@ func scoreSamehaMirror(label, iframeSrc string) int {
 	} else if strings.Contains(l, "480") {
 		score += 150
 	}
-	if strings.Contains(l, "wibufile") {
-		score += 120 // direct mp4 host
-	}
+	// Blogger / Blogspot is the primary functioning embed player
 	if strings.Contains(l, "blogspot") || strings.Contains(l, "blogger") || strings.Contains(u, "blogger.com") {
-		score += 300 // Working video player
+		score += 600
+	}
+	if strings.Contains(l, "wibufile") {
+		score += 200
 	}
 	// Mega mirrors on Samehadaku are routinely DMCA blocked / -16 EBLOCKED
 	if strings.Contains(l, "mega") || strings.Contains(u, "mega.nz") {
-		score -= 500
+		score -= 1000
 	}
 	if strings.Contains(l, "vip") {
 		score += 20
@@ -244,13 +245,9 @@ func resolveSamehaEmbed(embedURL, pageURL string) (string, error) {
 		return embedURL, nil
 	}
 
-	// Blogger video player
+	// Blogger video player: return embed URL directly so the browser loads the official iframe player.
+	// (Extracting googlevideo.com URLs causes HTTP 403 because Google binds the video token to the server IP)
 	if isBloggerVideoURL(embedURL) {
-		s, err := extractBloggerVideoURL(embedURL, pageURL)
-		if err == nil && isPlayableStreamURL(s) {
-			return s, nil
-		}
-		// If direct googlevideo extraction fails or is 403, return the Blogger embed player itself
 		return embedURL, nil
 	}
 

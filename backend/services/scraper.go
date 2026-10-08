@@ -980,13 +980,10 @@ func scrapeAnoboy(pageURL string) (*models.VideoMetadata, error) {
 }
 
 // resolveEmbedURL takes an iframe/embed URL and tries to resolve it to a
-// direct video stream URL. It handles Blogger video pages specially.
 func resolveEmbedURL(embedURL, referer string) (string, error) {
-	// If it's a Blogger video page, try dedicated extractor, fallback to embed URL
+	// If it's a Blogger video page, use the official embed player directly.
+	// (Direct googlevideo extraction results in HTTP 403 Forbidden on the client)
 	if isBloggerVideoURL(embedURL) {
-		if videoURL, err := extractBloggerVideoURL(embedURL, referer); err == nil && isPlayableStreamURL(videoURL) {
-			return videoURL, nil
-		}
 		return embedURL, nil
 	}
 
