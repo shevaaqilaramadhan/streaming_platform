@@ -81,10 +81,10 @@
       @error="onNativeError"
     ></video>
 
-    <!-- Custom controls overlay -->
+    <!-- Custom controls overlay (HTML5 and HLS only; iframe embeds render their own player controls) -->
     <Transition name="fade">
       <div
-        v-show="videoUrl"
+        v-show="videoUrl && videoMode !== 'iframe'"
         class="controls-overlay"
         :class="{ 'controls-visible': showControls }"
         @mouseenter="showControls = true"
@@ -1082,14 +1082,7 @@ onUnmounted(() => {
   border: none;
 }
 .video-wrapper.is-iframe .controls-overlay {
-  pointer-events: none;
-}
-.video-wrapper.is-iframe .controls-bar {
-  pointer-events: auto;
-}
-.video-wrapper.is-iframe .center-play-btn,
-.video-wrapper.is-iframe .progress-container {
-  display: none;
+  display: none !important;
 }
 
 /* Native video element */
