@@ -7,6 +7,7 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"net/http/cookiejar"
 	"net/url"
 	"regexp"
 	"strconv"
@@ -137,6 +138,25 @@ func scrapeIdlix(pageURL string) (*models.VideoMetadata, error) {
 	log.Printf("[IDLIX] Scraping %s kind=%s slug=%s s=%d e=%d base=%s",
 		pageURL, parsed.Kind, parsed.Slug, parsed.Season, parsed.Episode, parsed.BaseURL)
 
+	// Attempt direct HTTP API chain first (works in environments without Chrome, e.g. Render).
+	meta, httpErr := scrapeIdlixHTTP(parsed)
+	if httpErr == nil && meta != nil && meta.VideoURL != "" {
+		meta.Source = "idlix"
+		if meta.Title == "" {
+			meta.Title = humanizeSlug(parsed.Slug)
+		}
+		if parsed.Kind == "series" {
+			meta.Episode = fmt.Sprintf("S%02dE%02d", parsed.Season, parsed.Episode)
+		}
+		RegisterStreamMetadata(meta.VideoURL, meta.ThumbnailURL)
+		return meta, nil
+	}
+	log.Printf("[IDLIX] Direct HTTP API failed (%v), checking headless browser fallback...", httpErr)
+
+	if findChromePath() == "" {
+		return nil, fmt.Errorf("IDLIX direct HTTP scrape failed: %w (and Chrome/Chromium is not installed for headless fallback)", httpErr)
+	}
+
 	// Concurrency limit shared with other headless scrapes
 	select {
 	case scrapeSemaphore <- struct{}{}:
@@ -157,7 +177,6 @@ func scrapeIdlix(pageURL string) (*models.VideoMetadata, error) {
 	}
 	defer sess.close()
 
-	var meta *models.VideoMetadata
 	switch parsed.Kind {
 	case "movie":
 		meta, err = sess.scrapeMovie(parsed)
@@ -181,6 +200,237 @@ func scrapeIdlix(pageURL string) (*models.VideoMetadata, error) {
 	}
 	// Dynamic proxy allowlist: stream CDN + thumbnail hosts (rotating domains)
 	RegisterStreamMetadata(meta.VideoURL, meta.ThumbnailURL)
+	return meta, nil
+}
+
+// ── Pure HTTP Session (Steps 1–6 without headless Chromium) ───────────────────
+
+func scrapeIdlixHTTP(p *idlixParsedURL) (*models.VideoMetadata, error) {
+	jar, err := cookiejar.New(nil)
+	if err != nil {
+		return nil, err
+	}
+
+	client := &http.Client{
+		Jar:     jar,
+		Timeout: 35 * time.Second,
+	}
+	if httpClient.Transport != nil {
+		client.Transport = httpClient.Transport
+	}
+
+	desktopUA := "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+
+	fetchJSON := func(reqURL, method string, bodyBytes []byte, extraHeaders map[string]string) (map[string]interface{}, error) {
+		var bodyReader io.Reader
+		if len(bodyBytes) > 0 {
+			bodyReader = strings.NewReader(string(bodyBytes))
+		}
+		req, err := http.NewRequest(method, reqURL, bodyReader)
+		if err != nil {
+			return nil, err
+		}
+		req.Header.Set("User-Agent", desktopUA)
+		req.Header.Set("Accept", "application/json, text/plain, */*")
+		req.Header.Set("Accept-Language", "en-US,en;q=0.9")
+		for k, v := range extraHeaders {
+			req.Header.Set(k, v)
+		}
+
+		resp, err := client.Do(req)
+		if err != nil {
+			return nil, err
+		}
+		defer resp.Body.Close()
+
+		raw, err := io.ReadAll(io.LimitReader(resp.Body, 2*1024*1024))
+		if err != nil {
+			return nil, err
+		}
+		if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+			return nil, fmt.Errorf("HTTP %d from %s: %s", resp.StatusCode, reqURL, truncate(string(raw), 160))
+		}
+
+		var data map[string]interface{}
+		if err := json.Unmarshal(raw, &data); err != nil {
+			return nil, fmt.Errorf("JSON parse failed for %s (status %d): %w — body=%s",
+				reqURL, resp.StatusCode, err, truncate(string(raw), 160))
+		}
+		return data, nil
+	}
+
+	var uuid string
+	var label string
+	var playInfoType string
+
+	switch p.Kind {
+	case "movie":
+		label = "movie/" + p.Slug
+		playInfoType = "movie"
+		apiURL := fmt.Sprintf("%s/api/movies/%s", p.BaseURL, p.Slug)
+		log.Printf("[IDLIX-HTTP] Step 1: GET %s", apiURL)
+		data, err := fetchJSON(apiURL, "GET", nil, map[string]string{
+			"Referer": p.Referer,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("IDLIX HTTP step 1 (movie UUID) failed: %w", err)
+		}
+		uuid = pickString(data, "id")
+		if uuid == "" {
+			if nested, ok := data["data"].(map[string]interface{}); ok {
+				uuid = pickString(nested, "id")
+			}
+		}
+		if uuid == "" {
+			return nil, fmt.Errorf("IDLIX HTTP step 1: no content UUID in response for slug %q", p.Slug)
+		}
+
+	case "series":
+		label = fmt.Sprintf("series/%s/s%de%d", p.Slug, p.Season, p.Episode)
+		playInfoType = "episode"
+		apiURL := fmt.Sprintf("%s/api/series/%s/season/%d", p.BaseURL, p.Slug, p.Season)
+		log.Printf("[IDLIX-HTTP] Step 1: GET %s", apiURL)
+		data, err := fetchJSON(apiURL, "GET", nil, map[string]string{
+			"Referer": p.Referer,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("IDLIX HTTP step 1 (series season) failed: %w", err)
+		}
+
+		if season, ok := data["season"].(map[string]interface{}); ok {
+			if eps, ok := season["episodes"].([]interface{}); ok {
+				for _, raw := range eps {
+					ep, ok := raw.(map[string]interface{})
+					if !ok {
+						continue
+					}
+					num := pickInt(ep, "episodeNumber")
+					if num == p.Episode {
+						uuid = pickString(ep, "id")
+						break
+					}
+				}
+			}
+		}
+		if uuid == "" {
+			return nil, fmt.Errorf("IDLIX HTTP step 1: episode %d not found in season %d for slug %q", p.Episode, p.Season, p.Slug)
+		}
+
+	default:
+		return nil, fmt.Errorf("unsupported IDLIX kind %q", p.Kind)
+	}
+
+	// Step 2: track view (best-effort)
+	trackURL := p.BaseURL + "/api/views/track"
+	trackBody, _ := json.Marshal(map[string]string{
+		"contentType": playInfoType,
+		"contentId":   uuid,
+	})
+	_, _ = fetchJSON(trackURL, "POST", trackBody, map[string]string{
+		"Referer":      p.Referer,
+		"Content-Type": "application/json",
+	})
+
+	// Step 3: play-info
+	playInfoURL := fmt.Sprintf("%s/api/watch/play-info/%s/%s", p.BaseURL, playInfoType, uuid)
+	log.Printf("[IDLIX-HTTP] Step 3: GET %s", playInfoURL)
+	playInfo, err := fetchJSON(playInfoURL, "GET", nil, map[string]string{
+		"Referer": p.Referer,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("IDLIX HTTP step 3 (play-info) failed: %w", err)
+	}
+
+	kind := pickString(playInfo, "kind")
+	if kind != "gate" {
+		return nil, fmt.Errorf("IDLIX HTTP step 3: unexpected play-info kind %q (want gate)", kind)
+	}
+	gateToken := pickString(playInfo, "gateToken")
+	if gateToken == "" {
+		return nil, fmt.Errorf("IDLIX HTTP step 3: missing gateToken")
+	}
+
+	// Step 4: wait anti-scrape gate timer
+	unlockAt := pickFloat(playInfo, "unlockAt")
+	serverNow := pickFloat(playInfo, "serverNow")
+	countdownMs := unlockAt - serverNow
+	waitMs := countdownMs + 500
+	if waitMs < 0 {
+		waitMs = 0
+	}
+	if waitMs > float64(idlixGateMaxWait.Milliseconds()) {
+		waitMs = float64(idlixGateMaxWait.Milliseconds())
+	}
+	if waitMs > 0 {
+		log.Printf("[IDLIX-HTTP] Step 4: waiting %.0fms for gate unlock (%s)", waitMs, label)
+		time.Sleep(time.Duration(waitMs) * time.Millisecond)
+	} else {
+		log.Printf("[IDLIX-HTTP] Step 4: gate already unlocked")
+	}
+
+	// Step 5: claim session
+	claimURL := p.BaseURL + "/api/watch/session/claim"
+	claimBody, _ := json.Marshal(map[string]string{"gateToken": gateToken})
+	log.Printf("[IDLIX-HTTP] Step 5: POST %s", claimURL)
+	claimData, err := fetchJSON(claimURL, "POST", claimBody, map[string]string{
+		"Content-Type":     "application/json",
+		"Referer":          p.Referer,
+		"Origin":           p.BaseURL,
+		"X-Requested-With": "XMLHttpRequest",
+		"sec-ch-ua":        `"Not/A)Brand";v="99", "Chromium";v="120"`,
+		"sec-ch-ua-mobile": "?0",
+		"sec-fetch-dest":   "empty",
+		"sec-fetch-mode":   "cors",
+		"sec-fetch-site":   "same-origin",
+	})
+	if err != nil {
+		return nil, fmt.Errorf("IDLIX HTTP step 5 (session claim) failed: %w", err)
+	}
+
+	claim := pickString(claimData, "claim")
+	redeemURL := pickString(claimData, "redeemUrl")
+	if claim == "" || redeemURL == "" {
+		return nil, fmt.Errorf("IDLIX HTTP step 5: missing claim or redeemUrl in response")
+	}
+	title := pickString(claimData, "title")
+	log.Printf("[IDLIX-HTTP] Step 5 OK redeemUrl=%s title=%q", redeemURL, title)
+
+	RegisterStreamURLs(redeemURL)
+
+	// Step 6: majorplay redeem
+	playData, err := redeemMajorplay(redeemURL, claim, p.BaseURL)
+	if err != nil {
+		return nil, fmt.Errorf("IDLIX HTTP step 6 (majorplay redeem) failed: %w", err)
+	}
+
+	streamURL := pickString(playData, "url")
+	if streamURL == "" {
+		return nil, fmt.Errorf("IDLIX HTTP step 6: no stream url in redeem response")
+	}
+	log.Printf("[IDLIX-HTTP] Step 6 OK stream ready — %s", label)
+
+	RegisterStreamURLs(streamURL)
+	if subs, ok := playData["subtitles"].([]interface{}); ok {
+		for _, s := range subs {
+			if m, ok := s.(map[string]interface{}); ok {
+				for _, key := range []string{"path", "url", "file"} {
+					if u, _ := m[key].(string); u != "" {
+						RegisterStreamURLs(u)
+					}
+				}
+			}
+		}
+	}
+
+	meta = &models.VideoMetadata{
+		VideoURL: streamURL,
+		Title:    title,
+		Source:   "idlix",
+	}
+	if thumb := pickString(claimData, "poster"); thumb != "" {
+		meta.ThumbnailURL = thumb
+		RegisterStreamURLs(thumb)
+	}
 	return meta, nil
 }
 
